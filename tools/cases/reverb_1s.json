@@ -1,0 +1,7 @@
+{
+  "dragonfly_plate_simple": {"uri": "urn:dragonfly:plate", "controls": {"dry_level": 0, "early_level": 100, "algorithm": 0, "predelay": 0, "decay": 1.0, "low_cut": 0, "high_cut": 16000, "early_damp": 16000}},
+  "dragonfly_plate_nested": {"uri": "urn:dragonfly:plate", "controls": {"dry_level": 0, "early_level": 100, "algorithm": 1, "predelay": 0, "decay": 1.0, "low_cut": 0, "high_cut": 16000, "early_damp": 16000}},
+  "dragonfly_plate_tank":   {"uri": "urn:dragonfly:plate", "controls": {"dry_level": 0, "early_level": 100, "algorithm": 2, "predelay": 0, "decay": 1.0, "low_cut": 0, "high_cut": 16000, "early_damp": 16000}},
+  "dragonfly_room":         {"uri": "urn:dragonfly:room",  "controls": {"dry_level": 0, "early_level": 0, "late_level": 100, "predelay": 0, "decay": 1.0, "size": 12}},
+  "calf_reverb":            {"uri": "http://calf.sourceforge.net/plugins/Reverb", "controls": {"dry": 0, "amount": 1, "decay_time": 1.0, "predelay": 0, "hf_damp": 20000, "bass_cut": 20, "treble_cut": 20000}}
+}

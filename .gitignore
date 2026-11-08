@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.wav
+*.png
+work/
+!app/icons/*.png
+!docs/images/*.png
+app/target/
+/target/
+/target-u2404/
+/dist/
+build/vendor/

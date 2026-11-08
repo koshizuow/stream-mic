@@ -1,0 +1,12 @@
+[package]
+name = "stream-mic-dsp"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "Effects for stream-mic: pure computation, no allocation or locks while processing"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+libm = "0.2"

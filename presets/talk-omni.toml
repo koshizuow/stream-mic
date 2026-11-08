@@ -1,0 +1,67 @@
+# 說話（全指向）: an omnidirectional mic (a laptop's built-in mic, a lavalier) hears the whole room: fans, echo,
+# keyboard. They tend to sound thin and hissy, so a little body and no extra air.
+# Denoise is off by default (20 ms more delay; the expander handles the pauses, user 2026-11-07).
+# Thresholds (exp, comp) are placeholders until auto setup (build-plan step 8) measures the room.
+name = "talk-omni"
+label = "說話（全指向）"
+about = "筆電內建麥、領夾麥這類收整個房間的麥克風：補一點厚度，高頻不加亮"
+follow_music = false
+
+[knobs]
+denoise = 0.0
+body = 25.0
+space = 0.0
+sib = 50.0
+gate = -54.0
+
+[on]
+denoise = false
+eq = true
+deess = true
+exp = true
+comp = true
+verb = false
+lim = true
+
+[denoise]
+limit = 6.0
+
+[eq]
+hp = 80.0
+hp_base = 80.0
+low = 1.0
+pres = 1.0
+air = 0.0
+
+[deess]
+thr = 7.0
+freq = 7000.0
+max = 12.0
+
+[exp]
+thr = -54.0
+ratio = 2.5
+range = 12.0
+hold = 80.0
+rel = 200.0
+
+[comp]
+thr = -24.0
+ratio = 3.0
+knee = 6.0
+att = 10.0
+rel = 120.0
+makeup = 6.0
+
+[verb]
+mix = 0.0
+mix_dry = 0.0
+follow = 1.5
+size = 0.4
+pre = 0.0
+lowcut = 250.0
+damp = 7000.0
+
+[lim]
+ceil = -1.0
+rel = 50.0

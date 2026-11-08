@@ -1,0 +1,25 @@
+[package]
+name = "stream-mic-engine"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "stream-mic's real-time engine: PipeWire or WASAPI in and out, the chain between, a local HTTP control and meters"
+
+[[bin]]
+name = "stream-mic"
+path = "src/main.rs"
+
+[dependencies]
+stream-mic-chain = { path = "../chain" }
+stream-mic-denoise = { path = "../denoise" }
+stream-mic-dsp = { path = "../dsp" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+pipewire = { version = "0.8", features = ["v0_3_49"] }
+
+[target.'cfg(windows)'.dependencies]
+wasapi = "0.19"
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Com", "Win32_Media_Audio", "Win32_System_Registry", "Win32_Globalization"] }

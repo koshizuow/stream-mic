@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stream-mic</title>
+<link rel="stylesheet" href="common.css">
+<style>
+main { max-width: 1240px; margin: 0 auto; padding: 14px 18px 40px; display: grid; gap: 14px; }
+.chainbar { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: stretch; }
+/* the modes fill the chain card's height, three equal rows */
+.modes { display: grid; grid-auto-rows: 1fr; gap: 6px; min-width: 170px; }
+.modes button { text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 3px; padding: 7px 10px; cursor: pointer; color: var(--muted); font-size: 13px; }
+.modes button[aria-pressed="true"] { color: var(--text); border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.modes button small { display: block; font-size: 11px; color: var(--faint); }
+
+/* the scope: the last 10 s of the level, in and out, with the lines to drag */
+.scopecard { display: grid; grid-template-columns: 1fr 196px; gap: 12px; padding: 12px; }
+.scopewrap { position: relative; min-width: 0; }
+#scope { width: 100%; height: 340px; display: block; border-radius: 2px; touch-action: none; cursor: default; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 0; vertical-align: middle; margin-right: 5px; }
+.side { display: grid; grid-template-rows: auto 1fr; gap: 8px; }
+.side .cbox { min-height: 260px; }
+.lufs { text-align: center; }
+.lufs b { font-size: 24px; display: block; line-height: 1.1; }
+.lufs small { color: var(--muted); font-size: 11px; }
+.lufs.good b { color: var(--accent); }
+.lufs.low b { color: var(--gate); }
+.lufs.high b { color: var(--comp); }
+
+/* two rows of cards of one height: the knobs and a stage's details, then routing, monitor and devices */
+.lower { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: stretch; }
+#side { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-items: stretch; }
+.knobcard .lvl { grid-template-columns: 5.5em 1fr 4.4em; }
+.knobcard .lvl.gate span { color: var(--gate); }
+.top-actions { display: flex; gap: 8px; margin-bottom: 4px; }
+.top-actions .btn { flex: 1; }
+.detail { padding-top: 0; }
+.detail .dh { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.detail .dh b { font-size: 14px; }
+.detail .dh .spacer { flex: 1; }
+.detail .dh label { font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.detail canvas { width: 100%; height: 170px; display: block; border-radius: 2px; margin-top: 8px; touch-action: none; }
+
+@media (max-width: 1000px) {
+  #side { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 760px) {
+  .chainbar { grid-template-columns: 1fr; }
+  .modes { grid-template-columns: repeat(3, 1fr); min-width: 0; }
+  .scopecard { grid-template-columns: 1fr; }
+  #scope { height: 260px; }
+  .side { grid-template-columns: auto 1fr; grid-template-rows: none; align-items: center; }
+  .side .cbox { min-height: 170px; align-self: stretch; }
+  .lower, #side { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) { main { padding: 10px 12px 30px; } }
+</style>
+</head>
+<body data-layout="b">
+<header class="top">
+  <span class="brand">stream-mic</span>
+  <span class="chip ok" id="state"></span>
+  <span class="chip" id="lufsChip"></span>
+  <span class="chip" id="latChip"></span>
+  <span class="chip" id="cpuChip">CPU</span>
+  <span class="spacer"></span>
+  <div class="seg layoutsw" id="layoutSw"><button data-v="a" data-i18n="sw_a"></button><button data-v="b" data-i18n="sw_b"></button></div>
+  <button class="gear" id="gear" data-i18n-aria="settings" title="">⚙</button>
+</header>
+<div class="banner" id="banner" hidden></div>
+<main>
+  <div class="chainbar">
+    <div class="modes" id="modes"></div>
+    <section class="card" style="padding:10px">
+      <div class="chain" id="chain"></div>
+      <p class="note" data-i18n="chain_note_b"></p>
+    </section>
+  </div>
+
+  <section class="card scopecard">
+    <div class="scopewrap">
+      <canvas id="scope" data-i18n-aria="scope_label"></canvas>
+      <div class="legend">
+        <span><i style="background:#5b626d"></i><span data-i18n="lg_in"></span></span>
+        <span><i style="background:var(--accent)"></i><span data-i18n="lg_out"></span></span>
+        <span><i style="background:var(--gate)"></i><span data-i18n="lg_gate"></span></span>
+        <span><i style="background:var(--comp)"></i><span data-i18n="lg_comp"></span></span>
+        <span><i style="background:repeating-linear-gradient(90deg,#8b929d 0 3px,transparent 3px 6px)"></i><span data-i18n="lg_floor"></span></span>
+      </div>
+    </div>
+    <div class="side">
+      <div id="bal"></div>
+      <div class="cbox"><canvas id="meters"></canvas></div>
+    </div>
+  </section>
+
+  <div class="lower">
+    <section class="card knobcard">
+      <div class="top-actions"><button class="btn bypass" id="bypass" aria-pressed="false" data-i18n="bypass"></button><button class="btn" id="auto" data-i18n="auto"></button></div>
+      <div id="sliders"></div>
+      <p class="note" data-i18n="space_hint"></p>
+    </section>
+    <section class="card detail" id="detailCard"><h2 data-i18n="details"></h2><div id="detail"><p class="note" data-i18n="pick_stage"></p></div></section>
+  </div>
+  <div id="side"></div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

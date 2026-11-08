@@ -1,0 +1,23 @@
+stream-mic（試用版）Linux 使用說明
+
+直播用的麥克風處理：降噪、EQ、齒音、Gate、壓縮、限幅、空間感。處理好的聲音是一個叫「stream-mic」的虛擬麥克風，OBS 和 Discord 選它就好。電腦聲音可以放進「stream-mic 電腦聲音」這個輸出，一起送出去。
+
+需要
+- PipeWire（Ubuntu 22.10、Linux Mint 22 以後預設就是）。
+- WebKitGTK 4.1（視窗）和 AppIndicator（系統匣）：sudo apt install libwebkit2gtk-4.1-0 libayatana-appindicator3-1
+- 戴耳機。
+
+開始
+1. 解壓縮：tar xzf stream-mic-*-linux-*.tar.gz
+2. 執行：./stream-mic-*-linux/stream-mic
+3. 在視窗上方選麥克風和耳機，選「說話」或「唱歌」，按「自動設定」：安靜 3 秒，再念一段話 10 秒。
+4. OBS：音訊輸入擷取選「stream-mic」。Discord 的輸入裝置也選它。
+5. 電腦聲音：把遊戲或音樂的輸出改成「stream-mic 電腦聲音」（系統音效設定或 pavucontrol）。打開「送進虛擬麥克風」就會跟人聲一起送出，耳機裡也聽得到。
+
+關閉和開機啟動
+- 關掉視窗會縮到系統匣，要完全結束就在系統匣圖示選「結束」。
+- 設定裡可以打開「開機時自動啟動」。
+- 設定存在 ~/.config/stream-mic/settings.json。
+
+授權
+- stream-mic 以 Apache License 2.0 授權（LICENSE）。用到的第三方元件與授權見 NOTICE 和 THIRD_PARTY_LICENSES.txt。

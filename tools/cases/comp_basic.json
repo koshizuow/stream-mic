@@ -1,0 +1,11 @@
+{
+  "ref_giannoulis": {"uri": "ref", "controls": {"T": -30, "R": 4, "W": 0, "attack": 10, "release": 100}},
+  "lsp_peak_ff": {"uri": "http://lsp-plug.in/plugins/lv2/compressor_mono",
+                  "controls": {"sct": 0, "scm": 0, "al": 0.031623, "cr": 4, "at": 10, "rt": 100, "kn": 1.0, "rrl": 0}},
+  "lsp_rms_ff": {"uri": "http://lsp-plug.in/plugins/lv2/compressor_mono",
+                 "controls": {"sct": 0, "scm": 1, "al": 0.031623, "cr": 4, "at": 10, "rt": 100, "kn": 1.0, "rrl": 0}},
+  "lsp_peak_fb": {"uri": "http://lsp-plug.in/plugins/lv2/compressor_mono",
+                  "controls": {"sct": 1, "scm": 0, "al": 0.031623, "cr": 4, "at": 10, "rt": 100, "kn": 1.0, "rrl": 0}},
+  "calf_mono": {"uri": "http://calf.sourceforge.net/plugins/MonoCompressor",
+                "controls": {"threshold": 0.031623, "ratio": 4, "attack": 10, "release": 100, "knee": 1.0}}
+}

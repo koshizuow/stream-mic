@@ -1,0 +1,33 @@
+stream-mic（試用版）Windows 使用說明
+
+直播用的麥克風處理：降噪、EQ、齒音、Gate、壓縮、限幅、空間感，處理好的聲音送到一個虛擬麥克風，OBS 和 Discord 選它就好。電腦聲音（遊戲、音樂）也可以一起送進去。
+
+需要
+- Windows 10 2004 以後的版本，或 Windows 11（收電腦聲音要用到）。
+- VB-CABLE（虛擬音效線）：這個資料夾裡的 VBCABLE_Driver_Pack 壓縮檔就是它（沒有的話到 https://vb-audio.com/Cable/ 下載）。解壓縮後，對 VBCABLE_Setup_x64.exe 按右鍵「以系統管理員身分執行」，按 Install Driver。stream-mic 會把處理好的聲音送到它。
+  VB-CABLE 是 VB-Audio Software 的軟體，不屬於 stream-mic，也不在 stream-mic 的授權範圍內。來源：www.vb-cable.com。VB-CABLE 是捐贈軟體（donationware），歡迎到官網支持作者。在公司、學校、機關裡使用時，VB-Audio 要求購買授權。
+
+授權
+- stream-mic 以 Apache License 2.0 授權（LICENSE）。用到的第三方元件與授權見 NOTICE 和 THIRD_PARTY_LICENSES.txt。
+- 戴耳機。用喇叭的話，麥克風會收到電腦聲音，電腦聲音會被送出兩次。
+
+開始
+1. 把整個資料夾解壓縮到固定的位置（例如 文件\stream-mic）。stream-mic.exe 和 WebView2Loader.dll 要放在一起。
+2. 執行 stream-mic.exe。第一次執行 Windows 可能跳出「Windows 已保護您的電腦」：按「其他資訊」再按「仍要執行」（這個程式沒有付費的程式碼簽章）。
+3. 在視窗上方選你的麥克風和耳機，選「說話」或「唱歌」。
+4. 按「自動設定」：先安靜 3 秒，再照畫面念一段話 10 秒，它會自己設定 Gate、壓縮和音量。
+5. OBS：音訊輸入擷取（麥克風）選「CABLE Output (VB-Audio Virtual Cable)」。Discord：語音設定的輸入裝置選同一個。
+
+電腦聲音
+- stream-mic 會自己收電腦裡其他程式的聲音，不用改遊戲或音樂的輸出設定。「送進虛擬麥克風」打開時，OBS 從 CABLE Output 就收得到人聲加電腦聲音。
+- OBS 如果本來就另外擷取「桌面音效」，就把 stream-mic 的「送進虛擬麥克風」關掉，不然電腦聲音會有兩份。
+- 耳機裡的電腦聲音是 Windows 自己播的，不經過 stream-mic。
+
+關閉和開機啟動
+- 關掉視窗只是縮到右下角的系統匣，聲音繼續處理。要完全結束：系統匣的 stream-mic 圖示按右鍵，選「結束」。
+- 設定裡可以打開「開機時自動啟動」。
+- 設定存在 %APPDATA%\stream-mic\settings.json。要移除：關掉開機啟動、結束程式、刪掉這個資料夾和 stream-mic 的資料夾。
+
+有問題的時候
+- 畫面上的警告會說原因（例如偵測到回授、麥克風收到電腦聲音）。
+- 回報時請附上：發生的時間、做了什麼、畫面截圖。

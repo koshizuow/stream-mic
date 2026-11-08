@@ -1,0 +1,37 @@
+stream-mic
+Copyright (c) 2026-present Tzu-Hsien Kao and stream-mic contributors
+
+stream-mic is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party parts
+
+  Built into the program
+    DeepFilterNet (libDF) and its DeepFilterNet3 low-latency model, by Hendrik
+    Schröter: https://github.com/Rikorose/DeepFilterNet, MIT OR Apache-2.0.
+    The model is embedded in the binary unchanged.
+    Rust crates (Tauri, serde, tract and others): each under its own license,
+    almost all MIT and/or Apache-2.0; a few are MPL-2.0 (cssparser,
+    cssparser-macros, dtoa-short, option-ext, selectors), used unchanged from
+    crates.io where their source is available. The full list with every
+    license text is THIRD_PARTY_LICENSES.txt in each download.
+
+  Shipped beside the program
+    ui/fonts: Inter, JetBrains Mono and Noto Sans TC (subsets), SIL Open Font
+    License 1.1, see ui/fonts/OFL-*.txt.
+    WebView2Loader.dll (Windows): Microsoft Edge WebView2 SDK, redistributable
+    under the Microsoft WebView2 SDK license.
+
+  VB-CABLE (Windows download only)
+    The Windows download includes the VB-CABLE driver package from VB-Audio
+    Software, unchanged. VB-CABLE is not part of stream-mic and is not covered
+    by stream-mic's license.
+    Origin: www.vb-cable.com
+    VB-CABLE is a donationware, all participations are welcome.
+    In companies, institutions and public bodies where the people using it
+    cannot donate or buy it themselves, VB-Audio asks for paid licenses:
+    https://vb-audio.com/Services/licensing.htm
+
+  Not included
+    The test and measurement tools (tools/) refer to speech and singing
+    corpora (DAPS, VocalSet) that are downloaded separately under their own
+    terms; none of their audio is in this repository or the downloads.

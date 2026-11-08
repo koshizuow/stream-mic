@@ -1,0 +1,10 @@
+[package]
+name = "pw-probe"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+publish = false
+description = "Smallest PipeWire client: connects, lists audio nodes, exits. Checks the build path for Ubuntu 24.04-based desktops."
+
+[dependencies]
+pipewire = "0.8"

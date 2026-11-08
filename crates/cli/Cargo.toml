@@ -1,0 +1,17 @@
+[package]
+name = "stream-mic-cli"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "WAV in, WAV out through stream-mic's effects, for tests and measurements"
+
+[[bin]]
+name = "stream-mic-cli"
+path = "src/main.rs"
+
+[dependencies]
+stream-mic-dsp = { path = "../dsp" }
+stream-mic-denoise = { path = "../denoise" }
+stream-mic-chain = { path = "../chain" }
+hound = "3.5"

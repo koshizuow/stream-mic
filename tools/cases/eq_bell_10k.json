@@ -1,0 +1,8 @@
+{
+  "lsp_rlc_bt": {"uri": "http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono",
+                 "controls": {"mode": 0, "ft_0": 1, "fm_0": 0, "f_0": 10000, "g_0": 1.995262, "q_0": 1.0}},
+  "lsp_rlc_mt": {"uri": "http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono",
+                 "controls": {"mode": 0, "ft_0": 1, "fm_0": 1, "f_0": 10000, "g_0": 1.995262, "q_0": 1.0}},
+  "lsp_apo_dr": {"uri": "http://lsp-plug.in/plugins/lv2/para_equalizer_x8_mono",
+                 "controls": {"mode": 0, "ft_0": 1, "fm_0": 6, "f_0": 10000, "g_0": 1.995262, "q_0": 1.0}}
+}

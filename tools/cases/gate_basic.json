@@ -1,0 +1,12 @@
+{
+  "lsp_exp_r2": {"uri": "http://lsp-plug.in/plugins/lv2/expander_mono",
+                 "controls": {"scm": 0, "em": 0, "al": 0.01, "at": 5, "rt": 100, "er": 2, "kn": 1.0}},
+  "lsp_gate": {"uri": "http://lsp-plug.in/plugins/lv2/gate_mono",
+               "controls": {"scm": 0, "gt": 0.01, "gz": 1.0, "gh": 0, "at": 5, "rt": 100, "gr": 0.1}},
+  "lsp_gate_hyst": {"uri": "http://lsp-plug.in/plugins/lv2/gate_mono",
+                    "controls": {"scm": 0, "gt": 0.01, "gz": 1.0, "gh": 1, "ht": 0.005, "hz": 1.0, "at": 5, "rt": 100, "gr": 0.1}},
+  "calf_exp_r2": {"uri": "http://calf.sourceforge.net/plugins/Gate",
+                  "controls": {"range": 0.1, "threshold": 0.01, "ratio": 2, "attack": 5, "release": 100, "knee": 1}},
+  "calf_gate_r20": {"uri": "http://calf.sourceforge.net/plugins/Gate",
+                    "controls": {"range": 0.1, "threshold": 0.01, "ratio": 20, "attack": 5, "release": 100, "knee": 1}}
+}

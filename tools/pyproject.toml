@@ -1,0 +1,6 @@
+[project]
+name = "stream-mic-tools"
+version = "0.1.0"
+description = "Measurement and comparison tools for stream-mic"
+requires-python = ">=3.12"
+dependencies = ["numpy", "scipy", "soundfile", "matplotlib"]

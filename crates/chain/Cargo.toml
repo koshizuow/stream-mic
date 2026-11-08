@@ -1,0 +1,13 @@
+[package]
+name = "stream-mic-chain"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+description = "The stages in order, the send and monitor paths, presets and the four knobs"
+
+[dependencies]
+stream-mic-dsp = { path = "../dsp" }
+stream-mic-denoise = { path = "../denoise" }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"

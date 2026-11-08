@@ -1,0 +1,66 @@
+# 唱歌: no denoise (the speech models take held notes for noise, measurements.md), a slow shallow expander for note
+# tails (exp_sing.py), gentler compression, and reverb that follows the backing track (a third of it a cappella).
+# The reverb's own diffusion puts it about 29 ms after the voice, so no extra pre-delay.
+name = "sing"
+label = "唱歌"
+about = "不降噪，擴展器慢而淺，殘響跟著伴奏"
+follow_music = true
+
+[knobs]
+denoise = 0.0
+body = 20.0
+space = 47.0
+sib = 40.0
+gate = -58.0
+
+[on]
+denoise = false
+eq = true
+deess = true
+exp = true
+comp = true
+verb = true
+lim = true
+
+[denoise]
+limit = 6.0
+
+[eq]
+hp = 70.0
+hp_base = 70.0
+low = 1.0
+pres = 1.0
+air = 1.5
+
+[deess]
+thr = 8.5
+freq = 7000.0
+max = 10.0
+
+[exp]
+thr = -58.0
+ratio = 1.7
+range = 8.0
+hold = 150.0
+rel = 600.0
+
+[comp]
+thr = -22.0
+ratio = 2.5
+knee = 6.0
+att = 15.0
+rel = 180.0
+makeup = 5.0
+
+[verb]
+mix = 14.0
+mix_dry = 4.0
+follow = 1.5
+size = 1.35
+pre = 0.0
+lowcut = 250.0
+damp = 7000.0
+
+[lim]
+ceil = -1.0
+rel = 60.0
