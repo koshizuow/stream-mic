@@ -387,6 +387,45 @@ def unplug_and_plug_back():
 
 
 @test
+def pipewire_restarts():
+    """PipeWire restarted under a running engine (a WirePlumber rule changed, an update): it connects again by
+    itself, with the virtual mic, the mic and the headphones, and the sound goes through as before (2026-11-09: it
+    stayed on the dead connection with no devices until stream-mic itself was restarted). Restarts this user's
+    PipeWire: other sound on the machine stops for a moment. SMT_NO_PW_RESTART=1 leaves it out."""
+    if WIN or os.environ.get("SMT_NO_PW_RESTART"):
+        return
+    raw_routes()
+    MIC.stop()
+    PC.stop()
+    subprocess.run(["systemctl", "--user", "restart", "pipewire", "pipewire-pulse", "wireplumber"], check=True)
+    for _ in range(100):  # PipeWire answering again
+        if subprocess.run(["pw-cli", "info", "0"], capture_output=True).returncode == 0:
+            break
+        time.sleep(0.1)
+    make_sink("smt-mic")
+    make_sink("smt-spk")
+    MIC.__init__("smt-mic", MIC_TONE)
+    PC.__init__("stream-mic-pc-audio", PC_TONE)
+    for _ in range(100):
+        if pw_ids("stream-mic") and pw_ids("stream-mic-pc-audio"):
+            break
+        time.sleep(0.1)
+    # the computer sound's player started before our sink came back would have gone elsewhere: once more
+    PC.stop()
+    PC.__init__("stream-mic-pc-audio", PC_TONE)
+    time.sleep(3.0)
+    check("PipeWire restarted: the engine still running", ENG.running())
+    check("... the virtual mic and 電腦聲音 there again", all(vm_ids()), f"{vm_ids()}")
+    a = capture("stream-mic", 1.5)
+    # (with no "stream-mic" node the capture takes the default source: the levels count only with the node there)
+    vm = all(vm_ids())
+    check("... the mic in the virtual mic at its level", vm and abs(level(a, MIC_HZ) - MIC_DB) < 0.5, f"{level(a, MIC_HZ):.1f}")
+    check("... the computer sound in the virtual mic at its level", vm and abs(level(a, PC_HZ) - PC_DB) < 0.5, f"{level(a, PC_HZ):.1f}")
+    b = capture("smt-spk.monitor", 1.5)
+    check("... the headphones get the mic", abs(level(b, MIC_HZ) - MIC_DB) < 0.5, f"{level(b, MIC_HZ):.1f}")
+
+
+@test
 def settings_saved_from_the_desktop():
     """Windows: started as from the Start menu (no HOME), the settings go to %APPDATA%\\stream-mic and come back"""
     global ENG
@@ -457,7 +496,9 @@ PC = Player("stream-mic-pc-audio", PC_TONE)
 time.sleep(1.0)
 try:
     # the counters before unplugging (that underruns, as it should), and before the engine restarted without test devices
-    TESTS.sort(key=lambda f: (f in (process_loopback_hears_programs, settings_saved_from_the_desktop)) * 2 + (f is unplug_and_plug_back))
+    # PipeWire's restart last of all: every node is made anew there
+    TESTS.sort(key=lambda f: (f in (process_loopback_hears_programs, settings_saved_from_the_desktop)) * 2 + (f is unplug_and_plug_back)
+               + (f is pipewire_restarts) * 4)
     for fn in TESTS:
         if ONLY and fn.__name__ not in ONLY:
             continue

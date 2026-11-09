@@ -171,6 +171,24 @@ pub fn run(shared: Arc<Shared>, opts: Opts) -> Result<(), String> {
     let mainloop = pw::main_loop::MainLoop::new(None).map_err(|e| e.to_string())?;
     let context = pw::context::Context::new(&mainloop).map_err(|e| e.to_string())?;
     let core = context.connect(None).map_err(|e| e.to_string())?;
+    // PipeWire gone (restarted or stopped): end this run, and the audio thread starts another (lib.rs), which makes
+    // all four streams on the new PipeWire. Without this the main loop went on over a dead connection: no mic, no
+    // headphones, no virtual mic, until stream-mic itself was restarted (2026-11-09, a sample-rate rule restarting
+    // PipeWire). The lost connection is the core's EPIPE; other errors come on the core too and are not fatal (a
+    // device unplugged gives "unknown resource", -ENOENT: starting again then would make the virtual mic anew, which
+    // OBS does not find again)
+    let weak = mainloop.downgrade();
+    let _core_l = core
+        .add_listener_local()
+        .error(move |id, _seq, res, msg| {
+            if id == pw::core::PW_ID_CORE && res == -32 {
+                eprintln!("PipeWire: {msg} ({res}): connecting again");
+                if let Some(ml) = weak.upgrade() {
+                    ml.quit();
+                }
+            }
+        })
+        .register();
 
     let all = nodes(&core, &mainloop).map_err(|e| e.to_string())?;
     let (opt_mic, opt_out, quantum) = (opts.mic.clone(), opts.out.clone(), opts.quantum);

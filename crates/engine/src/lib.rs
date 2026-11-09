@@ -71,16 +71,29 @@ pub fn start(args: &[String]) -> Result<Engine, String> {
     let s = shared.clone();
     std::thread::Builder::new()
         .name("audio".into())
-        .spawn(move || loop {
-            let (mic, out) = {
-                let c = s.cfg.lock().unwrap();
-                (c.mic.clone(), c.out.clone())
-            };
-            if let Err(e) = audio::run(s.clone(), proc::Opts { mic, out, quantum }) {
-                eprintln!("stream-mic: {e}");
-                std::process::exit(1);
+        .spawn(move || {
+            // the first start failing ends the program (no PipeWire, another stream-mic running); once it ran, a
+            // failing start is PipeWire still coming back (restarted): try again each second
+            let mut ran = false;
+            loop {
+                let (mic, out) = {
+                    let c = s.cfg.lock().unwrap();
+                    (c.mic.clone(), c.out.clone())
+                };
+                match audio::run(s.clone(), proc::Opts { mic, out, quantum }) {
+                    Err(e) if !ran => {
+                        eprintln!("stream-mic: {e}");
+                        std::process::exit(1);
+                    }
+                    Err(e) => {
+                        eprintln!("stream-mic: {e}: trying again");
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                        continue;
+                    }
+                    Ok(()) => ran = true,
+                }
+                eprintln!("the audio stopped: starting it again");
             }
-            eprintln!("the audio stopped: starting it again");
         })
         .map_err(|e| e.to_string())?;
     Ok(Engine { shared, port })
