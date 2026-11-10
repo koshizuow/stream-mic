@@ -31,6 +31,11 @@ const I18N = {
     chain_note_b: '處理順序由左到右。點一段在下方看細節；亮燈是開著，橘色條是它現在壓了多少（GR）。',
     in_phones: '耳機也要', on: '開', eq_note: '拖曳圓點：Low Cut、High Cut 左右移動頻率，Mid、Presence 可以左右移動也可以上下（滑鼠停在點上轉滾輪調 Q），其他上下調整增減。High Cut 拉到最右邊是關。',
     verb_note: '八種人聲用的風格，各自有不同的長度、音色、初期反射和預延遲；空間感旋鈕只調量。改了下面的數值就是自訂。', custom: '自訂',
+    verb_note_pub: '照這一家公開的預設數值換算成這裡的參數；reverb 的算法不同，聽起來接近但不會一樣。空間感旋鈕只調量，改了下面的數值就是自訂。',
+    fam_ours: '我們的', fam_y: 'Y 家', fam_d: 'D 家', fam_f: 'F 家',
+    eq_natural: '自然', eq_demud: '去悶', eq_phone: '電話', eq_custom: '目前是模式的預設或自訂的值。',
+    eq_style_note: '選一個風格當起點，厚薄旋鈕會在上面再加厚或減薄；改了下面的數值就是自訂。',
+    eq_style_pub: '這一家公開的預設數值：中頻、清晰照原本的頻率和 Q；最低、最高那段換成我們的低頻、空氣感架形，所以接近但不完全一樣。厚薄旋鈕在上面再調。',
     details: '細節', pick_stage: '在上面的處理鏈點一段。', drag_too: '；門檻也可以在上面的圖拖',
     pc: '電腦聲音', lb_on: '送進虛擬麥克風', lb_db: '送出的音量', pc_db: '耳機裡的音量',
     pc_note_linux: '遊戲、音樂、影片的輸出選「{sink}」。瀏覽器這類不能選輸出的程式，把系統的預設輸出設成它就好：耳機是這裡直接接上的，不會因此聽不到。',
@@ -88,6 +93,11 @@ const I18N = {
     chain_note_b: 'Processed left to right. Click a stage for its details below. Lit: on; the amber bar: its gain reduction now.',
     in_phones: 'In headphones', on: 'On', eq_note: 'Drag a point: Low Cut and High Cut left and right for their frequency, Mid and Presence both ways (the wheel over the point sets its Q), the others up and down. High Cut all the way right is off.',
     verb_note: 'Eight styles for a voice, each its own length, tone, early reflections and pre-delay; the Space knob sets only how much. Changing a value below makes it custom.', custom: 'Custom',
+    verb_note_pub: 'This maker’s published preset values, turned into the settings here; the reverb itself is a different one, so it sounds close, not the same. The Space knob sets only how much; changing a value below makes it custom.',
+    fam_ours: 'Ours', fam_y: 'Y', fam_d: 'D', fam_f: 'F',
+    eq_natural: 'Natural', eq_demud: 'De-mud', eq_phone: 'Phone', eq_custom: 'The mode’s own values, or custom. ',
+    eq_style_note: 'A style to start from; the Body knob adds or takes away on top; changing a value below makes it custom.',
+    eq_style_pub: 'This maker’s published preset values: the mid and presence bells at their own frequency and Q; their lowest and highest go to our Low and Air shelves, so near, not the same. The Body knob adjusts on top.',
     details: 'Details', pick_stage: 'Click a stage in the chain above.', drag_too: '; the threshold can be dragged in the scope too',
     pc: 'Computer audio', lb_on: 'Send to the virtual mic', lb_db: 'Send level', pc_db: 'In headphones',
     pc_note_linux: 'Set games, music and videos to play to “{sink}”. For programs without that choice (a browser), make it the system’s default output: the headphones are connected here, so you still hear everything.',
@@ -147,9 +157,22 @@ let ST = {};           // GET /api/stats
 let D = null;          // the devices (event "devices")
 let online = false;
 const P = () => S.preset;
-// the reverb's styles (crates/chain/src/preset.rs VERB_STYLES, TC-Helicon R1's names and order)
-const VERB_STYLES = [['hall', 'Hall'], ['plate', 'Plate'], ['theatre', 'Theatre'], ['club', 'Club'], ['room', 'Room'], ['studio', 'Studio'], ['ambience', 'Ambience'], ['arena', 'Arena']];
-const verbStyleName = () => (VERB_STYLES.find(([v]) => v === P().verb.style) || [0, t('custom')])[1];
+// the reverb's styles (crates/chain/src/preset.rs VERB_STYLES) in their families: ours, and two made from published
+// presets ("y" Yamaha SPX2000's, "d" Dragonfly Reverb's; tools/verb_styles.py); the page names the families only
+const VERB_FAMILIES = [
+  ['ours', [['hall', 'Hall'], ['plate', 'Plate'], ['theatre', 'Theatre'], ['club', 'Club'], ['room', 'Room'], ['studio', 'Studio'], ['ambience', 'Ambience'], ['arena', 'Arena']]],
+  ['y', [['y-vocal-plate', 'Vocal Plate'], ['y-vocal-plate-x', 'Vocal Plate X'], ['y-vocal', 'Vocal'], ['y-vocal-chamber', 'Vocal Chamber'], ['y-presence', 'Presence'], ['y-small-room', 'Small Room'], ['y-medium-hall', 'Medium Hall'], ['y-echo-room', 'Echo Room']]],
+  ['d', [['d-small-vocal-room', 'Small Vocal Room'], ['d-medium-vocal-room', 'Medium Vocal Room'], ['d-large-vocal-room', 'Large Vocal Room'], ['d-vocal-studio', 'Vocal Studio'], ['d-small-vocal-hall', 'Small Vocal Hall'], ['d-medium-vocal-hall', 'Medium Vocal Hall'], ['d-large-vocal-hall', 'Large Vocal Hall'], ['d-clear-plate', 'Clear Plate']]],
+];
+const VERB_STYLES = VERB_FAMILIES.flatMap(([, l]) => l);
+// the EQ's styles (crates/chain/src/preset.rs EQ_STYLES): ours, and "f" (Focusrite Vocaster's published Enhance presets)
+const EQ_FAMILIES = [['ours', [['natural', t0('eq_natural')], ['demud', t0('eq_demud')], ['phone', t0('eq_phone')]]], ['f', [['f-clean', 'Clean'], ['f-warm', 'Warm'], ['f-bright', 'Bright'], ['f-radio', 'Radio']]]];
+let eqFam = null;
+function t0(k) { return () => t(k); }
+const nm = (n) => (typeof n === 'function' ? n() : n);
+const famOf = (style) => (VERB_FAMILIES.find(([, l]) => l.some(([v]) => v === style)) || [null])[0];
+let verbFam = null;   // the family tab shown (the current style's until another tab is picked)
+const verbStyleName = () => { const x = VERB_STYLES.find(([v]) => v === P().verb.style); return x ? x[1] : t('custom'); };
 const sing = () => !!P().follow_music;
 const win = () => S && S.platform === 'windows';
 const holding = new Set();   // controls being dragged: the answer does not move them
@@ -268,12 +291,12 @@ const STAGES = [
   { id: 'deess', name: 'De-esser', params: [['thr', 'Threshold', -10, 20, 0.5, 'dB'], ['freq', 'Frequency', 4000, 10000, 100, 'Hz'], ['max', 'Range', 3, 12, 1, 'dB']] },
   { id: 'exp', name: 'Gate', params: [['thr', 'Threshold', -80, -20, 1, 'dBFS'], ['ratio', 'Ratio 1:', 1.2, 4, 0.1, ''], ['range', 'Range', 3, 20, 1, 'dB'], ['hold', 'Hold', 0, 300, 10, 'ms'], ['rel', 'Release', 50, 1000, 10, 'ms']] },
   { id: 'comp', name: 'Compressor', params: [['thr', 'Threshold', -40, -6, 0.5, 'dBFS'], ['ratio', 'Ratio', 1, 8, 0.1, ':1'], ['knee', 'Knee', 0, 12, 0.5, 'dB'], ['att', 'Attack', 1, 40, 1, 'ms'], ['rel', 'Release', 30, 400, 5, 'ms'], ['makeup', 'Makeup', 0, 18, 0.5, 'dB']] },
-  { id: 'verb', name: 'Reverb', params: [['mix', 'Mix', 0, 40, 1, '%'], ['mix_dry', 'Mix (no backing)', 0, 40, 1, '%', 'sing'], ['follow', 'Follow', 0.3, 4, 0.1, 's', 'sing'], ['size', 'Decay', 0.2, 2.5, 0.05, 's'], ['pre', 'Pre-delay', 0, 60, 1, 'ms'], ['lowcut', 'Low Cut', 100, 500, 10, 'Hz'], ['damp', 'Damping', 2000, 12000, 100, 'Hz'], ['er', 'Early reflections', 0, 1, 0.05, ''], ['er_ms', 'Reflections spread', 5, 100, 1, 'ms']] },
+  { id: 'verb', name: 'Reverb', params: [['mix', 'Mix', 0, 40, 1, '%'], ['mix_dry', 'Mix (no backing)', 0, 40, 1, '%', 'sing'], ['follow', 'Follow', 0.3, 4, 0.1, 's', 'sing'], ['size', 'Decay', 0.2, 2.5, 0.05, 's'], ['pre', 'Pre-delay', 0, 100, 0.1, 'ms'], ['lowcut', 'Low Cut', 0, 500, 10, 'Hz'], ['damp', 'Damping', 1000, 20000, 50, 'Hz'], ['er', 'Early reflections', 0, 2, 0.01, ''], ['er_ms', 'Reflections spread', 5, 100, 0.1, 'ms'], ['hc', 'High Cut', 2000, 20000, 100, 'Hz']] },
   { id: 'lim', name: 'Limiter', params: [['ceil', 'Ceiling (true peak)', -6, 0, 0.1, 'dBTP'], ['rel', 'Release', 20, 200, 5, 'ms']] },
 ];
 const fmtP = (v, step) => (step < 1 ? (+v).toFixed(step < 0.1 ? 2 : 1) : String(Math.round(v)));
 // a detail slider's value as shown: the high cut at its top is off
-const pText = (sid, id, v, q) => (sid === 'eq' && id === 'hc' && +v >= 20000 ? t('w_off') : fmtP(v, q[4]) + (q[5] ? ' ' + q[5] : ''));
+const pText = (sid, id, v, q) => ((id === 'hc' && (+v >= 20000 || +v === 0)) || (sid === 'verb' && id === 'lowcut' && +v === 0) ? t('w_off') : fmtP(v, q[4]) + (q[5] ? ' ' + q[5] : ''));
 const stageLatency = (id) => (id === 'denoise' ? ST.denoise_ms || 20 : id === 'lim' ? ST.send_limiter_ms || 2.1 : 0);
 const msText = (ms) => (ms ? (Math.round(ms * 10) / 10).toFixed(ms % 1 ? 1 : 0) : '0') + ' ms';
 function setKnob(id, v) {
@@ -823,8 +846,11 @@ function buildDetail() {
     '<label>' + t('in_phones') + '<button class="sw" data-mon role="switch"></button></label>' +
     '<label>' + t('on') + '<button class="sw" data-on role="switch"></button></label></div>' +
     (LAYOUT === 'b' && (s.id === 'exp' || s.id === 'comp') ? '<p class="note" style="margin-top:0">' + t('drag_too').replace(/^；|^; /, '') + '</p>' : '') +
-    (s.id === 'eq' ? '<canvas id="eqc"></canvas><p class="note">' + t('eq_note') + '</p>' : '') +
-    (s.id === 'verb' ? '<div class="seg" id="vstyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)">' + VERB_STYLES.map(([v, n]) => '<button data-v="' + v + '">' + n + '</button>').join('') + '</div><p class="note"><span id="vcustom"></span>' + t('verb_note') + '</p>' : '') +
+    (s.id === 'eq' ? '<div class="seg" id="efams" style="margin-bottom:6px">' + EQ_FAMILIES.map(([f]) => '<button data-f="' + f + '">' + t('fam_' + f) + '</button>').join('') + '</div>' +
+      '<div class="seg" id="estyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)"></div><p class="note"><span id="ecustom"></span><span id="enote"></span></p>' +
+      '<canvas id="eqc"></canvas><p class="note">' + t('eq_note') + '</p>' : '') +
+    (s.id === 'verb' ? '<div class="seg" id="vfams" style="margin-bottom:6px">' + VERB_FAMILIES.map(([f]) => '<button data-f="' + f + '">' + t('fam_' + f) + '</button>').join('') + '</div>' +
+      '<div class="seg" id="vstyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)"></div><p class="note"><span id="vcustom"></span><span id="vnote"></span></p>' : '') +
     s.params.map(([id, name, lo, hi, st, u, only]) => '<label class="lvl" data-p="' + id + '"' + (only ? ' data-only="' + only + '"' : '') + '><span>' + name + '</span><input type="range" min="' + lo + '" max="' + hi + '" step="' + st + '"><output></output></label>').join('');
   d.querySelector('[data-on]').onclick = () => post({ preset: { on: { [s.id]: !P().on[s.id] } } });
   d.querySelector('[data-mon]').onclick = () => post({ preset: { monitor: { [s.id]: !P().monitor[s.id] } } });
@@ -836,8 +862,15 @@ function buildDetail() {
     numEdit(row.querySelector('output'), { lo: q[2], hi: q[3], step: q[4], unit: q[5] === 'ms' ? 'ms' : undefined, get: () => P()[s.id][id],
       apply: (x) => { P()[s.id][id] = x; post({ preset: { [s.id]: { [id]: x } } }); detailUI(); } });
   }
-  if (s.id === 'eq') eqDrag($('eqc'));
-  if (s.id === 'verb') for (const b of $('vstyles').children) b.onclick = () => post({ preset: { verb: { style: b.dataset.v } } });
+  if (s.id === 'eq') {
+    eqDrag($('eqc'));
+    $('efams').onclick = (e) => { const b = e.target.closest('button'); if (b) { eqFam = b.dataset.f; detailUI(); } };
+    $('estyles').onclick = (e) => { const b = e.target.closest('button'); if (b) post({ preset: { eq: { style: b.dataset.v } } }); };
+  }
+  if (s.id === 'verb') {
+    $('vfams').onclick = (e) => { const b = e.target.closest('button'); if (b) { verbFam = b.dataset.f; detailUI(); } };
+    $('vstyles').onclick = (e) => { const b = e.target.closest('button'); if (b) post({ preset: { verb: { style: b.dataset.v } } }); };
+  }
   detailUI();
 }
 function detailUI() {
@@ -854,9 +887,23 @@ function detailUI() {
     if (!isEditing(row.querySelector('output'))) row.querySelector('output').textContent = pText(s.id, id, v, q);
   }
   if (s.id === 'eq' && !holding.has('eq')) drawEq($('eqc'));
+  if (s.id === 'eq') {
+    const cur = P().eq.style || '', fam = eqFam || (EQ_FAMILIES.find(([, l]) => l.some(([v]) => v === cur)) || ['ours'])[0];
+    for (const b of $('efams').children) b.setAttribute('aria-pressed', b.dataset.f === fam);
+    const list = EQ_FAMILIES.find(([f]) => f === fam)[1];
+    if ($('estyles').dataset.k !== fam + LANG) { $('estyles').dataset.k = fam + LANG; $('estyles').innerHTML = list.map(([v, n]) => '<button data-v="' + v + '">' + nm(n) + '</button>').join(''); }
+    for (const b of $('estyles').children) b.setAttribute('aria-pressed', b.dataset.v === cur);
+    $('ecustom').textContent = cur ? '' : t('eq_custom');
+    $('enote').textContent = t(fam === 'ours' ? 'eq_style_note' : 'eq_style_pub');
+  }
   if (s.id === 'verb') {
+    const fam = verbFam || famOf(P().verb.style) || 'ours';
+    for (const b of $('vfams').children) b.setAttribute('aria-pressed', b.dataset.f === fam);
+    const list = VERB_FAMILIES.find(([f]) => f === fam)[1];
+    if ($('vstyles').dataset.fam !== fam) { $('vstyles').dataset.fam = fam; $('vstyles').innerHTML = list.map(([v, n]) => '<button data-v="' + v + '">' + n + '</button>').join(''); }
     for (const b of $('vstyles').children) b.setAttribute('aria-pressed', b.dataset.v === P().verb.style);
     $('vcustom').textContent = P().verb.style ? '' : t('custom') + '。';
+    $('vnote').textContent = t(fam === 'ours' ? 'verb_note' : 'verb_note_pub');
   }
 }
 

@@ -240,8 +240,20 @@ pub fn apply(shared: &Shared, v: &Value) -> Result<(), String> {
                         err = Some(format!("no reverb style {st}"));
                         c.preset.verb.style = bv.style.clone();
                     }
-                } else if (cv.size, cv.pre, cv.lowcut, cv.damp, cv.er, cv.er_ms) != (bv.size, bv.pre, bv.lowcut, bv.damp, bv.er, bv.er_ms) {
+                } else if (cv.size, cv.pre, cv.lowcut, cv.damp, cv.er, cv.er_ms, cv.hc) != (bv.size, bv.pre, bv.lowcut, bv.damp, bv.er, bv.er_ms, bv.hc) {
                     c.preset.verb.style = String::new();
+                }
+                // an EQ style chosen: its values; an EQ value changed by hand (not by the Body knob): no style any more
+                let (be, ce) = (&before.preset.eq, &c.preset.eq);
+                let knob_moved = c.preset.knobs.body != before.preset.knobs.body;
+                if ce.style != be.style && !ce.style.is_empty() {
+                    let st = c.preset.eq.style.clone();
+                    if !c.preset.set_eq_style(&st) {
+                        err = Some(format!("no EQ style {st}"));
+                        c.preset.eq.style = be.style.clone();
+                    }
+                } else if !knob_moved && (ce.hp, ce.low, ce.mid, ce.mid_f, ce.mid_q, ce.pres, ce.pres_f, ce.pres_q, ce.air, ce.hc) != (be.hp, be.low, be.mid, be.mid_f, be.mid_q, be.pres, be.pres_f, be.pres_q, be.air, be.hc) {
+                    c.preset.eq.style = String::new();
                 }
                 // the preset name is not the page's to change
                 c.preset.name = cfg.preset.name.clone();

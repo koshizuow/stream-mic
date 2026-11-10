@@ -92,6 +92,8 @@ impl Default for DenoiseP {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct EqP {
+    /// the style the values came from (EQ_STYLES), "" when they were changed by hand
+    pub style: String,
     pub hp: f64,
     /// the low cut with the body knob at 0 or above (thinner turns raise it)
     pub hp_base: f64,
@@ -108,11 +110,14 @@ pub struct EqP {
     pub air: f64,
     /// the high cut, Hz; 20000 is off
     pub hc: f64,
+    /// Low's and Presence's gain with the Body knob at 0 (the style's; the knob adds to them)
+    pub low_base: f64,
+    pub pres_base: f64,
 }
 
 impl Default for EqP {
     fn default() -> Self {
-        EqP { hp: 80.0, hp_base: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 1.5, pres_f: 3000.0, pres_q: 1.0, air: 1.0, hc: 20000.0 }
+        EqP { style: String::new(), hp: 80.0, hp_base: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 1.5, pres_f: 3000.0, pres_q: 1.0, air: 1.0, hc: 20000.0, low_base: 0.0, pres_base: 1.5 }
     }
 }
 
@@ -198,12 +203,49 @@ pub struct VerbP {
     pub er: f64,
     /// how long the early reflections spread, ms
     pub er_ms: f64,
+    /// a low pass on the wet, Hz; 20000 is off
+    pub hc: f64,
 }
 
 impl Default for VerbP {
     fn default() -> Self {
-        VerbP { style: String::new(), mix: 0.0, mix_dry: 0.0, follow: 1.5, size: 0.4, pre: 0.0, lowcut: 250.0, damp: 7000.0, er: 0.0, er_ms: 30.0 }
+        VerbP { style: String::new(), mix: 0.0, mix_dry: 0.0, follow: 1.5, size: 0.4, pre: 0.0, lowcut: 250.0, damp: 7000.0, er: 0.0, er_ms: 30.0, hc: 20000.0 }
     }
+}
+
+/// An EQ style: the low cut, the four bands (Low a shelf at 200 Hz, Mid and Presence bells with their centre and Q, Air
+/// a shelf at 10 kHz), the high cut (20000: none)
+#[derive(Clone, Copy, Debug)]
+pub struct EqStyle {
+    pub name: &'static str,
+    pub hp: f64,
+    pub low: f64,
+    pub mid: f64,
+    pub mid_f: f64,
+    pub mid_q: f64,
+    pub pres: f64,
+    pub pres_f: f64,
+    pub pres_q: f64,
+    pub air: f64,
+    pub hc: f64,
+}
+
+/// Ours, and "f": Focusrite Vocaster's four Enhance presets as its user guide publishes them (v1.3, "Enhance
+/// Presets' Parameters": a high pass at 80 Hz and three bells, frequency, Q and gain). Their bells go into our
+/// bands: a bell at 100-135 Hz becomes the Low shelf, 450 Hz-1 kHz the Mid, 2-6 kHz the Presence, 7-11 kHz the Air
+/// shelf (so those two are near, not the same); the rest are exact. Their compressor is not part of the EQ.
+pub const EQ_STYLES: [EqStyle; 7] = [
+    EqStyle { name: "natural", hp: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 0.0, pres_f: 3000.0, pres_q: 1.0, air: 0.0, hc: 20000.0 },
+    EqStyle { name: "demud", hp: 100.0, low: 0.0, mid: -3.0, mid_f: 300.0, mid_q: 1.4, pres: 1.5, pres_f: 3000.0, pres_q: 1.0, air: 1.0, hc: 20000.0 },
+    EqStyle { name: "phone", hp: 300.0, low: 0.0, mid: 3.0, mid_f: 1000.0, mid_q: 1.0, pres: 2.0, pres_f: 2500.0, pres_q: 1.0, air: 0.0, hc: 3400.0 },
+    EqStyle { name: "f-clean", hp: 80.0, low: -2.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 2.0, pres_f: 2000.0, pres_q: 0.6, air: 2.0, hc: 20000.0 },
+    EqStyle { name: "f-warm", hp: 80.0, low: -1.0, mid: 2.5, mid_f: 450.0, mid_q: 0.7, pres: -1.0, pres_f: 2500.0, pres_q: 0.5, air: 0.0, hc: 20000.0 },
+    EqStyle { name: "f-bright", hp: 80.0, low: 0.0, mid: -2.0, mid_f: 500.0, mid_q: 0.6, pres: 3.0, pres_f: 2000.0, pres_q: 0.6, air: 3.0, hc: 20000.0 },
+    EqStyle { name: "f-radio", hp: 80.0, low: 2.5, mid: -1.5, mid_f: 1000.0, mid_q: 1.5, pres: 1.5, pres_f: 6000.0, pres_q: 1.15, air: 0.0, hc: 20000.0 },
+];
+
+pub fn eq_style(name: &str) -> Option<EqStyle> {
+    EQ_STYLES.iter().copied().find(|s| s.name == name)
 }
 
 /// A reverb style: decay T60 s, extra pre-delay ms, low cut Hz, damping Hz, early reflections 0..1, their spread ms,
@@ -218,6 +260,8 @@ pub struct VerbStyle {
     pub damp: f64,
     pub er: f64,
     pub er_ms: f64,
+    /// a low pass on the wet, Hz (20000: none)
+    pub hc: f64,
     pub gain: f64,
 }
 
@@ -229,15 +273,33 @@ pub struct VerbStyle {
 /// against Yamaha SPX2000's and Dragonfly Reverb's published presets (design notes reverb-styles.md): the plate made
 /// 2.0 s (theirs 1.8-2.44 s, R1 has it as long as the hall) and the low cuts brought to 100-200 Hz (theirs mostly
 /// none or 50-140 Hz; the smallest space keeps 250).
-pub const VERB_STYLES: [VerbStyle; 8] = [
-    VerbStyle { name: "hall", size: 1.8, pre: 25.0, lowcut: 150.0, damp: 6500.0, er: 0.35, er_ms: 45.0, gain: 1.00 },
-    VerbStyle { name: "plate", size: 2.0, pre: 20.0, lowcut: 150.0, damp: 11000.0, er: 0.12, er_ms: 25.0, gain: 0.90 },
-    VerbStyle { name: "theatre", size: 1.9, pre: 30.0, lowcut: 100.0, damp: 3500.0, er: 0.12, er_ms: 50.0, gain: 1.08 },
-    VerbStyle { name: "club", size: 0.9, pre: 10.0, lowcut: 150.0, damp: 6500.0, er: 0.6, er_ms: 30.0, gain: 1.07 },
-    VerbStyle { name: "room", size: 0.75, pre: 0.0, lowcut: 200.0, damp: 11000.0, er: 0.6, er_ms: 20.0, gain: 1.03 },
-    VerbStyle { name: "studio", size: 0.85, pre: 0.0, lowcut: 150.0, damp: 7000.0, er: 0.35, er_ms: 25.0, gain: 1.09 },
-    VerbStyle { name: "ambience", size: 0.45, pre: 0.0, lowcut: 250.0, damp: 11000.0, er: 0.7, er_ms: 12.0, gain: 1.07 },
-    VerbStyle { name: "arena", size: 3.0, pre: 60.0, lowcut: 100.0, damp: 6000.0, er: 0.35, er_ms: 80.0, gain: 0.95 },
+pub const VERB_STYLES: [VerbStyle; 24] = [
+    VerbStyle { name: "hall", size: 1.8, pre: 25.0, lowcut: 150.0, damp: 6500.0, er: 0.35, er_ms: 45.0, hc: 20000.0, gain: 1.00 },
+    VerbStyle { name: "plate", size: 2.0, pre: 20.0, lowcut: 150.0, damp: 11000.0, er: 0.12, er_ms: 25.0, hc: 20000.0, gain: 0.90 },
+    VerbStyle { name: "theatre", size: 1.9, pre: 30.0, lowcut: 100.0, damp: 3500.0, er: 0.12, er_ms: 50.0, hc: 20000.0, gain: 1.08 },
+    VerbStyle { name: "club", size: 0.9, pre: 10.0, lowcut: 150.0, damp: 6500.0, er: 0.6, er_ms: 30.0, hc: 20000.0, gain: 1.07 },
+    VerbStyle { name: "room", size: 0.75, pre: 0.0, lowcut: 200.0, damp: 11000.0, er: 0.6, er_ms: 20.0, hc: 20000.0, gain: 1.03 },
+    VerbStyle { name: "studio", size: 0.85, pre: 0.0, lowcut: 150.0, damp: 7000.0, er: 0.35, er_ms: 25.0, hc: 20000.0, gain: 1.09 },
+    VerbStyle { name: "ambience", size: 0.45, pre: 0.0, lowcut: 250.0, damp: 11000.0, er: 0.7, er_ms: 12.0, hc: 20000.0, gain: 1.07 },
+    VerbStyle { name: "arena", size: 3.0, pre: 60.0, lowcut: 100.0, damp: 6000.0, er: 0.35, er_ms: 80.0, hc: 20000.0, gain: 0.95 },
+    // Yamaha SPX2000 ("y") and Dragonfly Reverb ("d"): their published presets, turned into ours by
+    // tools/verb_styles.py (how, and the sources, there)
+    VerbStyle { name: "y-vocal-plate", size: 2.4, pre: 35.0, lowcut: 80.0, damp: 5050.0, er: 1.98, er_ms: 22.1, hc: 10600.0, gain: 1.03 },
+    VerbStyle { name: "y-vocal-plate-x", size: 2.44, pre: 30.0, lowcut: 140.0, damp: 5100.0, er: 0.0, er_ms: 25.0, hc: 6300.0, gain: 1.55 },
+    VerbStyle { name: "y-vocal", size: 2.5, pre: 25.0, lowcut: 90.0, damp: 3400.0, er: 0.0, er_ms: 25.0, hc: 8000.0, gain: 1.53 },
+    VerbStyle { name: "y-vocal-chamber", size: 1.9, pre: 49.8, lowcut: 0.0, damp: 4200.0, er: 0.93, er_ms: 25.0, hc: 7500.0, gain: 1.46 },
+    VerbStyle { name: "y-presence", size: 1.4, pre: 35.0, lowcut: 0.0, damp: 20000.0, er: 1.32, er_ms: 12.0, hc: 14000.0, gain: 0.91 },
+    VerbStyle { name: "y-small-room", size: 0.68, pre: 0.0, lowcut: 0.0, damp: 6700.0, er: 0.0, er_ms: 25.0, hc: 10000.0, gain: 1.61 },
+    VerbStyle { name: "y-medium-hall", size: 2.01, pre: 15.0, lowcut: 0.0, damp: 9550.0, er: 0.0, er_ms: 25.0, hc: 5000.0, gain: 1.57 },
+    VerbStyle { name: "y-echo-room", size: 1.0, pre: 0.0, lowcut: 0.0, damp: 1050.0, er: 1.21, er_ms: 20.2, hc: 6700.0, gain: 1.91 },
+    VerbStyle { name: "d-small-vocal-room", size: 0.3, pre: 0.0, lowcut: 0.0, damp: 6400.0, er: 0.73, er_ms: 20.0, hc: 20000.0, gain: 1.12 },
+    VerbStyle { name: "d-medium-vocal-room", size: 0.6, pre: 2.0, lowcut: 0.0, damp: 6000.0, er: 0.81, er_ms: 20.0, hc: 20000.0, gain: 1.08 },
+    VerbStyle { name: "d-large-vocal-room", size: 1.0, pre: 4.0, lowcut: 0.0, damp: 5000.0, er: 0.91, er_ms: 20.0, hc: 20000.0, gain: 1.04 },
+    VerbStyle { name: "d-vocal-studio", size: 0.8, pre: 0.0, lowcut: 0.0, damp: 2550.0, er: 0.86, er_ms: 20.0, hc: 5800.0, gain: 1.96 },
+    VerbStyle { name: "d-small-vocal-hall", size: 1.2, pre: 4.0, lowcut: 0.0, damp: 3050.0, er: 0.95, er_ms: 20.0, hc: 6250.0, gain: 1.76 },
+    VerbStyle { name: "d-medium-vocal-hall", size: 1.3, pre: 8.0, lowcut: 0.0, damp: 3900.0, er: 0.97, er_ms: 20.0, hc: 5800.0, gain: 1.69 },
+    VerbStyle { name: "d-large-vocal-hall", size: 2.4, pre: 12.0, lowcut: 0.0, damp: 3900.0, er: 1.16, er_ms: 20.0, hc: 6250.0, gain: 1.45 },
+    VerbStyle { name: "d-clear-plate", size: 0.6, pre: 0.0, lowcut: 100.0, damp: 7000.0, er: 0.0, er_ms: 20.0, hc: 13000.0, gain: 1.48 },
 ];
 
 pub fn verb_style(name: &str) -> Option<VerbStyle> {
@@ -298,7 +360,7 @@ pub const BUILT_IN: [(&str, &str); 3] = [
 ];
 
 fn half(v: f64) -> f64 {
-    (v * 2.0).round() / 2.0
+    (v * 2.0).round() / 2.0 + 0.0 // (+ 0.0: no "-0")
 }
 
 impl Preset {
@@ -326,8 +388,9 @@ impl Preset {
             "body" => {
                 let v = v.clamp(-100.0, 100.0);
                 self.knobs.body = v;
-                self.eq.low = half(v / 100.0 * 4.0);
-                self.eq.pres = half(1.5 - v / 100.0 * 2.0);
+                // on top of the style's (or the preset's) own Low and Presence
+                self.eq.low = half(self.eq.low_base + v / 100.0 * 4.0).clamp(-6.0, 6.0);
+                self.eq.pres = half(self.eq.pres_base - v / 100.0 * 2.0).clamp(-6.0, 6.0);
                 self.eq.hp = if v < 0.0 { ((self.eq.hp_base - v * 0.5) / 5.0).round() * 5.0 } else { self.eq.hp_base };
             }
             "space" => {
@@ -368,8 +431,30 @@ impl Preset {
         v.damp = st.damp;
         v.er = st.er;
         v.er_ms = st.er_ms;
+        v.hc = st.hc;
         let k = self.knobs.space;
         self.set_knob("space", k);
+        true
+    }
+
+    /// An EQ style: its values, Low and Presence as the Body knob's base, and the Body knob again on top
+    pub fn set_eq_style(&mut self, name: &str) -> bool {
+        let Some(st) = eq_style(name) else { return false };
+        let e = &mut self.eq;
+        e.style = st.name.to_string();
+        e.hp = st.hp;
+        e.hp_base = st.hp;
+        e.low_base = st.low;
+        e.mid = st.mid;
+        e.mid_f = st.mid_f;
+        e.mid_q = st.mid_q;
+        e.pres_base = st.pres;
+        e.pres_f = st.pres_f;
+        e.pres_q = st.pres_q;
+        e.air = st.air;
+        e.hc = st.hc;
+        let k = self.knobs.body;
+        self.set_knob("body", k);
         true
     }
 
@@ -419,6 +504,7 @@ impl Preset {
             follow_s: v.follow,
             er: v.er,
             er_ms: v.er_ms,
+            hc_hz: v.hc,
         }
     }
 

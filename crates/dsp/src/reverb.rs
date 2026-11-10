@@ -58,12 +58,14 @@ pub struct VerbParams {
     pub er: f64,
     /// Over how long the early reflections spread, ms (up to ER_MAX_MS)
     pub er_ms: f64,
+    /// A low pass on the wet (the published presets' "LPF" or "high cut"), Hz; 0 or 20 kHz and above: off
+    pub hc_hz: f64,
 }
 
 impl Default for VerbParams {
     /// The singing preset.
     fn default() -> Self {
-        VerbParams { t60_s: 1.6, pre_ms: 10.0, lowcut_hz: 250.0, damp_hz: 7000.0, mix: 0.14, mix_dry: 0.04, follow_s: 1.5, er: 0.0, er_ms: 30.0 }
+        VerbParams { t60_s: 1.6, pre_ms: 10.0, lowcut_hz: 250.0, damp_hz: 7000.0, mix: 0.14, mix_dry: 0.04, follow_s: 1.5, er: 0.0, er_ms: 30.0, hc_hz: 0.0 }
     }
 }
 
@@ -134,6 +136,7 @@ pub struct Reverb {
     pre_len: usize,
     pre_pos: usize,
     lowcut: Svf,
+    hc: [Svf; 2],
     diff: Vec<Lines>,
     lp_loop: Lines,
     gains: [f64; N],
@@ -161,6 +164,7 @@ impl Reverb {
             pre_len: 0,
             pre_pos: 0,
             lowcut: Svf::default(),
+            hc: Default::default(),
             diff: Vec::new(),
             lp_loop: Lines::default(),
             gains: [0.0; N],
@@ -189,6 +193,10 @@ impl Reverb {
         self.damp = (-2.0 * std::f64::consts::PI * self.p.damp_hz / fs).exp();
         let kind = if self.p.lowcut_hz > 0.0 { Kind::HighPass } else { Kind::Off };
         self.lowcut.set_ramped(Coefs::design(kind, self.p.lowcut_hz, std::f64::consts::FRAC_1_SQRT_2, 0.0, fs), (0.01 * fs) as u32);
+        let hk = if self.p.hc_hz > 0.0 && self.p.hc_hz < 20000.0f64.min(fs * 0.45) { Kind::LowPass } else { Kind::Off };
+        for f in self.hc.iter_mut() {
+            f.set_ramped(Coefs::design(hk, self.p.hc_hz, std::f64::consts::FRAC_1_SQRT_2, 0.0, fs), (0.01 * fs) as u32);
+        }
         self.pre_len = (self.p.pre_ms.max(0.0) * 1e-3 * fs).round() as usize;
         let span = self.p.er_ms.clamp(1.0, ER_MAX_MS) * 1e-3 * fs;
         for (t, f) in self.er_tap.iter_mut().zip(ER_AT) {
@@ -288,7 +296,7 @@ impl Reverb {
             l += w[2 * c];
             r += w[2 * c + 1];
         }
-        (l * norm + el, r * norm + er)
+        (self.hc[0].tick(l * norm + el), self.hc[1].tick(r * norm + er))
     }
 
     #[inline]
@@ -371,6 +379,7 @@ impl Stage for Reverb {
         self.pre.iter_mut().for_each(|v| *v = 0.0);
         self.pre_pos = 0;
         self.lowcut.reset();
+        self.hc.iter_mut().for_each(Svf::reset);
         self.diff.iter_mut().for_each(Lines::clear);
         self.lp_loop.clear();
         self.lp = [0.0; N];
@@ -379,5 +388,38 @@ impl Stage for Reverb {
         self.er_lp = [0.0; 2];
         self.music_pow = 0.0;
         self.mix_now = self.p.mix_dry;
+    }
+}
+
+#[cfg(test)]
+mod er_balance {
+    use super::*;
+    use crate::Stage;
+
+    /// The early reflections' energy against the tail's (an impulse in), for turning a published preset's
+    /// early/late balance into `er`: cargo test -p stream-mic-dsp er_balance -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn er_balance() {
+        let energy = |er: f64, t60: f64| {
+            let mut r = Reverb::new(VerbParams { t60_s: t60, pre_ms: 0.0, lowcut_hz: 0.0, damp_hz: 20000.0, mix: 1.0, mix_dry: 1.0, follow_s: 1.0, er, er_ms: 30.0, hc_hz: 0.0 });
+            r.prepare(48000.0, 256);
+            r.without_music();
+            let n = 48000 * 6;
+            let mut x = vec![0f32; n];
+            x[0] = 1.0;
+            let (mut l, mut rr) = (vec![0f32; n], vec![0f32; n]);
+            for (i, c) in x.chunks(256).enumerate() {
+                r.process_stereo(c, &mut l[i * 256..i * 256 + c.len()], &mut rr[i * 256..i * 256 + c.len()]);
+            }
+            l[0] -= 1.0;
+            rr[0] -= 1.0;
+            l.iter().chain(rr.iter()).map(|v| (*v as f64).powi(2)).sum::<f64>() / 2.0
+        };
+        for t60 in [0.5, 1.0, 2.0, 3.0] {
+            let tail = energy(0.0, t60);
+            let both = energy(1.0, t60);
+            println!("t60 {t60}: tail {:.3}, early at er 1 {:.3} ({:.1} dB under the tail)", tail, both - tail, 10.0 * (tail / (both - tail)).log10());
+        }
     }
 }

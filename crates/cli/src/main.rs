@@ -153,6 +153,7 @@ fn parse_verb(s: &str) -> Result<VerbParams, String> {
             "follow" => p.follow_s = v,
             "er" => p.er = v,
             "erms" => p.er_ms = v,
+            "hc" => p.hc_hz = v,
             _ => return Err(format!("unknown --verb key {k}")),
         }
     }
