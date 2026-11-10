@@ -30,6 +30,7 @@ const I18N = {
     chain_note_a: '點一段看細節，亮燈是開著；橘色條是它現在壓了多少（GR）',
     chain_note_b: '處理順序由左到右。點一段在下方看細節；亮燈是開著，橘色條是它現在壓了多少（GR）。',
     in_phones: '耳機也要', on: '開', eq_note: '拖曳圓點：Low Cut 左右移動頻率，其他上下調整增減。',
+    verb_note: '風格依 TC-Helicon R1 的分類：各自的長度、音色、初期反射、預延遲；空間感旋鈕只調量。改了下面的數值就是自訂。', custom: '自訂',
     details: '細節', pick_stage: '在上面的處理鏈點一段。', drag_too: '；門檻也可以在上面的圖拖',
     pc: '電腦聲音', lb_on: '送進虛擬麥克風', lb_db: '送出的音量', pc_db: '耳機裡的音量',
     pc_note_linux: '遊戲、音樂、影片的輸出選「{sink}」。瀏覽器這類不能選輸出的程式，把系統的預設輸出設成它就好：耳機是這裡直接接上的，不會因此聽不到。',
@@ -86,6 +87,7 @@ const I18N = {
     chain_note_a: 'Click a stage for its details. Lit: on; the amber bar: its gain reduction now',
     chain_note_b: 'Processed left to right. Click a stage for its details below. Lit: on; the amber bar: its gain reduction now.',
     in_phones: 'In headphones', on: 'On', eq_note: 'Drag a point: Low Cut left and right for its frequency, the others up and down.',
+    verb_note: 'Styles after TC-Helicon R1: each its own length, tone, early reflections and pre-delay; the Space knob sets only how much. Changing a value below makes it custom.', custom: 'Custom',
     details: 'Details', pick_stage: 'Click a stage in the chain above.', drag_too: '; the threshold can be dragged in the scope too',
     pc: 'Computer audio', lb_on: 'Send to the virtual mic', lb_db: 'Send level', pc_db: 'In headphones',
     pc_note_linux: 'Set games, music and videos to play to “{sink}”. For programs without that choice (a browser), make it the system’s default output: the headphones are connected here, so you still hear everything.',
@@ -145,6 +147,9 @@ let ST = {};           // GET /api/stats
 let D = null;          // the devices (event "devices")
 let online = false;
 const P = () => S.preset;
+// the reverb's styles (crates/chain/src/preset.rs VERB_STYLES, TC-Helicon R1's names and order)
+const VERB_STYLES = [['hall', 'Hall'], ['plate', 'Plate'], ['theatre', 'Theatre'], ['club', 'Club'], ['room', 'Room'], ['studio', 'Studio'], ['ambience', 'Ambience'], ['arena', 'Arena']];
+const verbStyleName = () => (VERB_STYLES.find(([v]) => v === P().verb.style) || [0, t('custom')])[1];
 const sing = () => !!P().follow_music;
 const win = () => S && S.platform === 'windows';
 const holding = new Set();   // controls being dragged: the answer does not move them
@@ -173,7 +178,7 @@ const modeAbout = (b) => (I18N[LANG]['a_' + b.name.replace(/-/g, '_')] ? t('a_' 
 const KNOBS = [
   { id: 'denoise', name: () => 'Denoise', min: 0, max: () => (sing() ? 30 : 100), word: (v) => (v === 0 ? t('w_off') : v < 34 ? t('w_light') : v < 67 ? t('w_mid') : t('w_strong')) },
   { id: 'body', name: () => t('k_body'), min: -100, max: () => 100, word: (v) => (v === 0 ? t('w_flat') : (v < 0 ? t('w_thin') : t('w_thick')) + Math.abs(Math.round(v / 10))) },
-  { id: 'space', name: () => t('k_space'), min: 0, max: () => 100, word: (v) => (v === 0 ? t('w_off') : sing() ? t('with_backing') + ' ' + Math.round(P().verb.mix) + '% · ' + t('without_backing') + ' ' + Math.round(P().verb.mix_dry) + '%' : Math.round(v) + '') },
+  { id: 'space', name: () => t('k_space'), min: 0, max: () => 100, word: (v) => (v === 0 ? t('w_off') : verbStyleName() + ' · ' + (sing() ? t('with_backing') + ' ' + Math.round(P().verb.mix) + '% · ' + t('without_backing') + ' ' + Math.round(P().verb.mix_dry) + '%' : Math.round(v) + '')) },
   { id: 'sib', name: () => 'De-ess', min: 0, max: () => 100, word: (v) => (v === 0 ? t('w_off') : Math.round(v) + '') },
   { id: 'gate', name: () => 'Gate', min: -80, max: () => -20, word: (v) => (v <= -80 ? t('w_off') : Math.round(v) + ' dB') },
 ];
@@ -184,7 +189,7 @@ const STAGES = [
   { id: 'deess', name: 'De-esser', params: [['thr', 'Threshold', -10, 20, 0.5, 'dB'], ['freq', 'Frequency', 4000, 10000, 100, 'Hz'], ['max', 'Range', 3, 12, 1, 'dB']] },
   { id: 'exp', name: 'Gate', params: [['thr', 'Threshold', -80, -20, 1, 'dBFS'], ['ratio', 'Ratio 1:', 1.2, 4, 0.1, ''], ['range', 'Range', 3, 20, 1, 'dB'], ['hold', 'Hold', 0, 300, 10, 'ms'], ['rel', 'Release', 50, 1000, 10, 'ms']] },
   { id: 'comp', name: 'Compressor', params: [['thr', 'Threshold', -40, -6, 0.5, 'dBFS'], ['ratio', 'Ratio', 1, 8, 0.1, ':1'], ['knee', 'Knee', 0, 12, 0.5, 'dB'], ['att', 'Attack', 1, 40, 1, 'ms'], ['rel', 'Release', 30, 400, 5, 'ms'], ['makeup', 'Makeup', 0, 18, 0.5, 'dB']] },
-  { id: 'verb', name: 'Reverb', params: [['mix', 'Mix', 0, 40, 1, '%'], ['mix_dry', 'Mix (no backing)', 0, 40, 1, '%', 'sing'], ['follow', 'Follow', 0.3, 4, 0.1, 's', 'sing'], ['size', 'Decay', 0.2, 2.5, 0.05, 's'], ['pre', 'Pre-delay', 0, 60, 1, 'ms'], ['lowcut', 'Low Cut', 100, 500, 10, 'Hz'], ['damp', 'Damping', 2000, 12000, 100, 'Hz']] },
+  { id: 'verb', name: 'Reverb', params: [['mix', 'Mix', 0, 40, 1, '%'], ['mix_dry', 'Mix (no backing)', 0, 40, 1, '%', 'sing'], ['follow', 'Follow', 0.3, 4, 0.1, 's', 'sing'], ['size', 'Decay', 0.2, 2.5, 0.05, 's'], ['pre', 'Pre-delay', 0, 60, 1, 'ms'], ['lowcut', 'Low Cut', 100, 500, 10, 'Hz'], ['damp', 'Damping', 2000, 12000, 100, 'Hz'], ['er', 'Early reflections', 0, 1, 0.05, ''], ['er_ms', 'Reflections spread', 5, 100, 1, 'ms']] },
   { id: 'lim', name: 'Limiter', params: [['ceil', 'Ceiling (true peak)', -6, 0, 0.1, 'dBTP'], ['rel', 'Release', 20, 200, 5, 'ms']] },
 ];
 const fmtP = (v, step) => (step < 1 ? (+v).toFixed(step < 0.1 ? 2 : 1) : String(Math.round(v)));
@@ -711,6 +716,7 @@ function buildDetail() {
     '<label>' + t('on') + '<button class="sw" data-on role="switch"></button></label></div>' +
     (LAYOUT === 'b' && (s.id === 'exp' || s.id === 'comp') ? '<p class="note" style="margin-top:0">' + t('drag_too').replace(/^；|^; /, '') + '</p>' : '') +
     (s.id === 'eq' ? '<canvas id="eqc"></canvas><p class="note">' + t('eq_note') + '</p>' : '') +
+    (s.id === 'verb' ? '<div class="seg" id="vstyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)">' + VERB_STYLES.map(([v, n]) => '<button data-v="' + v + '">' + n + '</button>').join('') + '</div><p class="note"><span id="vcustom"></span>' + t('verb_note') + '</p>' : '') +
     s.params.map(([id, name, lo, hi, st, u, only]) => '<label class="lvl" data-p="' + id + '"' + (only ? ' data-only="' + only + '"' : '') + '><span>' + name + '</span><input type="range" min="' + lo + '" max="' + hi + '" step="' + st + '"><output></output></label>').join('');
   d.querySelector('[data-on]').onclick = () => post({ preset: { on: { [s.id]: !P().on[s.id] } } });
   d.querySelector('[data-mon]').onclick = () => post({ preset: { monitor: { [s.id]: !P().monitor[s.id] } } });
@@ -721,6 +727,7 @@ function buildDetail() {
     inp.addEventListener('change', () => { send.end(+inp.value); holding.delete('p:' + id); });
   }
   if (s.id === 'eq') eqDrag($('eqc'));
+  if (s.id === 'verb') for (const b of $('vstyles').children) b.onclick = () => post({ preset: { verb: { style: b.dataset.v } } });
   detailUI();
 }
 function detailUI() {
@@ -737,6 +744,10 @@ function detailUI() {
     row.querySelector('output').textContent = fmtP(v, q[4]) + (q[5] ? ' ' + q[5] : '');
   }
   if (s.id === 'eq' && !holding.has('eq')) drawEq($('eqc'));
+  if (s.id === 'verb') {
+    for (const b of $('vstyles').children) b.setAttribute('aria-pressed', b.dataset.v === P().verb.style);
+    $('vcustom').textContent = P().verb.style ? '' : t('custom') + '。';
+  }
 }
 
 // the computer's sound, the monitor, the devices, start with the computer

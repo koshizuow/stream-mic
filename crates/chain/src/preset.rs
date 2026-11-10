@@ -170,6 +170,8 @@ impl Default for LimP {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct VerbP {
+    /// the style the values below came from (VERB_STYLES), "" when they were changed by hand
+    pub style: String,
     /// wet with music playing, %
     pub mix: f64,
     /// wet without music, %
@@ -182,12 +184,51 @@ pub struct VerbP {
     pub pre: f64,
     pub lowcut: f64,
     pub damp: f64,
+    /// early reflections, 0 none .. 1
+    pub er: f64,
+    /// how long the early reflections spread, ms
+    pub er_ms: f64,
 }
 
 impl Default for VerbP {
     fn default() -> Self {
-        VerbP { mix: 0.0, mix_dry: 0.0, follow: 1.5, size: 0.4, pre: 0.0, lowcut: 250.0, damp: 7000.0 }
+        VerbP { style: String::new(), mix: 0.0, mix_dry: 0.0, follow: 1.5, size: 0.4, pre: 0.0, lowcut: 250.0, damp: 7000.0, er: 0.0, er_ms: 30.0 }
     }
+}
+
+/// A reverb style: decay T60 s, extra pre-delay ms, low cut Hz, damping Hz, early reflections 0..1, their spread ms,
+/// and how much of the Space knob's mix it takes: the wet's energy (an impulse, test style_energy) evened out to
+/// the hall's, within 1.2 dB without it; to be set by ear.
+#[derive(Clone, Copy, Debug)]
+pub struct VerbStyle {
+    pub name: &'static str,
+    pub size: f64,
+    pub pre: f64,
+    pub lowcut: f64,
+    pub damp: f64,
+    pub er: f64,
+    pub er_ms: f64,
+    pub gain: f64,
+}
+
+/// The styles of TC-Helicon VoiceTone R1 (its manual's table: length, tone, initial reflections, pre-delay), in its
+/// order. Length: shortest 0.45 s, short 0.75-0.9, medium 1.5-1.9, longest 3; tone: bright 11 kHz damping, medium
+/// 6.5-7, dark 3.5; reflections: low 0.12, medium 0.35, high 0.6-0.7; pre-delay (on top of the tail's own 29 ms,
+/// which the reflections come before): none 0, short 10, medium 20-25, "yes" 30, long 60 ms. The vocal ranges and
+/// low cuts as in io44-control's table (mixing guides: lead 0.8-2 s; pre-delay room 5-20, plate 15-35, hall 20-60).
+pub const VERB_STYLES: [VerbStyle; 8] = [
+    VerbStyle { name: "hall", size: 1.8, pre: 25.0, lowcut: 180.0, damp: 6500.0, er: 0.35, er_ms: 45.0, gain: 1.00 },
+    VerbStyle { name: "plate", size: 1.5, pre: 20.0, lowcut: 350.0, damp: 11000.0, er: 0.12, er_ms: 25.0, gain: 0.96 },
+    VerbStyle { name: "theatre", size: 1.9, pre: 30.0, lowcut: 120.0, damp: 3500.0, er: 0.12, er_ms: 50.0, gain: 1.08 },
+    VerbStyle { name: "club", size: 0.9, pre: 10.0, lowcut: 200.0, damp: 6500.0, er: 0.6, er_ms: 30.0, gain: 1.07 },
+    VerbStyle { name: "room", size: 0.75, pre: 0.0, lowcut: 300.0, damp: 11000.0, er: 0.6, er_ms: 20.0, gain: 1.03 },
+    VerbStyle { name: "studio", size: 0.85, pre: 0.0, lowcut: 200.0, damp: 7000.0, er: 0.35, er_ms: 25.0, gain: 1.09 },
+    VerbStyle { name: "ambience", size: 0.45, pre: 0.0, lowcut: 400.0, damp: 11000.0, er: 0.7, er_ms: 12.0, gain: 1.07 },
+    VerbStyle { name: "arena", size: 3.0, pre: 60.0, lowcut: 150.0, damp: 6000.0, er: 0.35, er_ms: 80.0, gain: 0.95 },
+];
+
+pub fn verb_style(name: &str) -> Option<VerbStyle> {
+    VERB_STYLES.iter().copied().find(|s| s.name == name)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -282,9 +323,10 @@ impl Preset {
                 let v = v.clamp(0.0, 100.0);
                 self.knobs.space = v;
                 self.on.verb = v > 0.0;
-                self.verb.mix = (v / 100.0 * 30.0).round();
+                // how wet only: the style decides how long and how bright (2026-11-10, styles as in io44-control)
+                let gain = verb_style(&self.verb.style).map_or(1.0, |s| s.gain);
+                self.verb.mix = (v / 100.0 * 30.0 * gain).round();
                 self.verb.mix_dry = (self.verb.mix * if self.follow_music { 0.3 } else { 1.0 }).round();
-                self.verb.size = ((0.4 + v / 100.0 * 2.0) * 20.0).round() / 20.0;
             }
             "sib" => {
                 let v = v.clamp(0.0, 100.0);
@@ -300,6 +342,22 @@ impl Preset {
             }
             _ => {}
         }
+    }
+
+    /// A reverb style: its decay, pre-delay, low cut, damping and reflections, and the Space knob again (its mix)
+    pub fn set_verb_style(&mut self, name: &str) -> bool {
+        let Some(st) = verb_style(name) else { return false };
+        let v = &mut self.verb;
+        v.style = st.name.to_string();
+        v.size = st.size;
+        v.pre = st.pre;
+        v.lowcut = st.lowcut;
+        v.damp = st.damp;
+        v.er = st.er;
+        v.er_ms = st.er_ms;
+        let k = self.knobs.space;
+        self.set_knob("space", k);
+        true
     }
 
     /// Every knob applied again (what a preset's parameters would be if only the knobs had set them)
@@ -346,6 +404,8 @@ impl Preset {
             mix: v.mix / 100.0,
             mix_dry: v.mix_dry / 100.0,
             follow_s: v.follow,
+            er: v.er,
+            er_ms: v.er_ms,
         }
     }
 
@@ -373,5 +433,40 @@ mod tests {
     fn a_preset_survives_toml() {
         let p = Preset::built_in("sing").unwrap();
         assert_eq!(Preset::parse(&p.to_toml()).unwrap(), p);
+    }
+}
+
+#[cfg(test)]
+mod style_energy {
+    use super::*;
+    use stream_mic_dsp::reverb::Reverb;
+    use stream_mic_dsp::Stage;
+
+    /// The wet's energy (an impulse in, 6 s) for each style at mix 1: what the styles' gains even out.
+    /// cargo test -p stream-mic-chain style_energy -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn style_energy() {
+        for st in VERB_STYLES {
+            let mut p = Preset::default();
+            p.set_verb_style(st.name);
+            p.verb.mix = 100.0;
+            p.verb.mix_dry = 100.0;
+            let mut r = Reverb::new(p.verb_params());
+            r.prepare(48000.0, 256);
+            r.without_music();
+            let n = 48000 * 6;
+            let mut x = vec![0f32; n];
+            x[0] = 1.0;
+            let (mut l, mut rr) = (vec![0f32; n], vec![0f32; n]);
+            for (i, c) in x.chunks(256).enumerate() {
+                r.process_stereo(c, &mut l[i * 256..i * 256 + c.len()], &mut rr[i * 256..i * 256 + c.len()]);
+            }
+            l[0] -= 1.0;
+            rr[0] -= 1.0;
+            let e: f64 = l.iter().chain(rr.iter()).map(|v| (*v as f64).powi(2)).sum::<f64>() / 2.0;
+            let early: f64 = l[..4800].iter().chain(rr[..4800].iter()).map(|v| (*v as f64).powi(2)).sum::<f64>() / 2.0;
+            println!("{:9} energy {:7.2} dB  first 100 ms {:7.2} dB", st.name, 10.0 * e.log10(), 10.0 * early.log10());
+        }
     }
 }

@@ -1,6 +1,6 @@
 # 唱歌: no denoise (the speech models take held notes for noise, measurements.md), a slow shallow expander for note
 # tails (exp_sing.py), gentler compression, and reverb that follows the backing track (a third of it a cappella).
-# The reverb's own diffusion puts it about 29 ms after the voice, so no extra pre-delay.
+# The reverb's style is Hall (TC-Helicon R1's table, crates/chain/src/preset.rs VERB_STYLES); Space sets how wet.
 name = "sing"
 label = "唱歌"
 about = "不降噪，擴展器慢而淺，殘響跟著伴奏"
@@ -53,13 +53,16 @@ rel = 180.0
 makeup = 5.0
 
 [verb]
+style = "hall"
 mix = 14.0
 mix_dry = 4.0
 follow = 1.5
-size = 1.35
-pre = 0.0
-lowcut = 250.0
-damp = 7000.0
+size = 1.8
+pre = 25.0
+lowcut = 180.0
+damp = 6500.0
+er = 0.35
+er_ms = 45.0
 
 [lim]
 ceil = -1.0

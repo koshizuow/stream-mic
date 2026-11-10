@@ -232,6 +232,17 @@ pub fn apply(shared: &Shared, v: &Value) -> Result<(), String> {
                 if c.preset.exp.thr != before.preset.exp.thr && c.preset.knobs.gate == before.preset.knobs.gate {
                     c.preset.knobs.gate = c.preset.exp.thr.clamp(-80.0, -20.0);
                 }
+                // a reverb style chosen: its values; a value of the reverb changed by hand: no style any more
+                let (bv, cv) = (&before.preset.verb, &c.preset.verb);
+                if cv.style != bv.style && !cv.style.is_empty() {
+                    let st = c.preset.verb.style.clone();
+                    if !c.preset.set_verb_style(&st) {
+                        err = Some(format!("no reverb style {st}"));
+                        c.preset.verb.style = bv.style.clone();
+                    }
+                } else if (cv.size, cv.pre, cv.lowcut, cv.damp, cv.er, cv.er_ms) != (bv.size, bv.pre, bv.lowcut, bv.damp, bv.er, bv.er_ms) {
+                    c.preset.verb.style = String::new();
+                }
                 // the preset name is not the page's to change
                 c.preset.name = cfg.preset.name.clone();
                 *cfg = c;

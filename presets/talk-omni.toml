@@ -54,13 +54,16 @@ rel = 120.0
 makeup = 6.0
 
 [verb]
+style = "studio"
 mix = 0.0
 mix_dry = 0.0
 follow = 1.5
-size = 0.4
+size = 0.85
 pre = 0.0
-lowcut = 250.0
+lowcut = 200.0
 damp = 7000.0
+er = 0.35
+er_ms = 25.0
 
 [lim]
 ceil = -1.0

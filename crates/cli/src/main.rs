@@ -5,7 +5,7 @@
 //! turns knobs (denoise body space sib), --music M.wav, --monitor MON.wav writes the monitor path too, --bypass,
 //! --realtime paces the blocks as audio arrives. --show-preset NAME prints a preset as TOML.
 //! --autoset NOISE.wav VOICE.wav [--preset P] [--target -18] [--write OUT.toml]: auto setup (build-plan step 8).
-//! Stages run in the order given; --verb (t60 pre lowcut damp mix mixdry follow) comes last, with
+//! Stages run in the order given; --verb (t60 pre lowcut damp mix mixdry follow er erms) comes last, with
 //! --music M.wav as the backing track it follows (without it, mix applies all the time) and
 //! --stereo for a two-channel output. Keys: --eq hp low pres air; --deess thr freq q ratio max att
 //! rel; --comp thr ratio knee att rel makeup
@@ -145,6 +145,8 @@ fn parse_verb(s: &str) -> Result<VerbParams, String> {
             "mix" => p.mix = v,
             "mixdry" => p.mix_dry = v,
             "follow" => p.follow_s = v,
+            "er" => p.er = v,
+            "erms" => p.er_ms = v,
             _ => return Err(format!("unknown --verb key {k}")),
         }
     }

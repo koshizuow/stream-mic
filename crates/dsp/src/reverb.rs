@@ -11,6 +11,11 @@
 //!
 //! The diffuser centres the wet about 29 ms after the dry, so `pre_ms` is added on top of that.
 //!
+//! Early reflections (the styles' "initial reflections", TC-Helicon VoiceTone R1's table): twelve taps on the
+//! pre-delayed, low-cut input spread over `er_ms`, alternately left and right, falling off, through the same
+//! damping as the tail; `er` is their level (0 none). They come before the tail's diffuse onset, so a short pre-delay
+//! with strong reflections reads as a small room. Without them (er 0) the output is the FDN alone, as tools/reffdn.py.
+//!
 //! Mix follows the backing track (singing, DECISIONS.md): `set_music` hands it the music for the
 //! block, sample by sample (so the result does not depend on the block size); above MUSIC_ON_DB the mix glides to `mix`, below to `mix_dry`, over `follow_s`.
 
@@ -30,6 +35,11 @@ const FLIPS: [[f64; N]; 4] = [
 /// Music louder than this (dBFS, 300 ms power average) counts as "playing".
 pub const MUSIC_ON_DB: f64 = -50.0;
 const MUSIC_TAU_S: f64 = 0.3;
+/// The reflections' times as fractions of `er_ms`, and their gains (even taps left, odd right)
+const ER_AT: [f64; 12] = [0.07, 0.13, 0.21, 0.27, 0.36, 0.43, 0.52, 0.6, 0.69, 0.78, 0.88, 1.0];
+const ER_GAIN: [f64; 12] = [1.0, 0.93, 0.85, 0.79, 0.72, 0.66, 0.6, 0.55, 0.5, 0.46, 0.42, 0.38];
+/// The longest reflection pattern, ms
+pub const ER_MAX_MS: f64 = 100.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VerbParams {
@@ -44,12 +54,16 @@ pub struct VerbParams {
     pub mix_dry: f64,
     /// Seconds to glide between the two.
     pub follow_s: f64,
+    /// Early reflections' level, 0 none .. 1
+    pub er: f64,
+    /// Over how long the early reflections spread, ms (up to ER_MAX_MS)
+    pub er_ms: f64,
 }
 
 impl Default for VerbParams {
     /// The singing preset.
     fn default() -> Self {
-        VerbParams { t60_s: 1.6, pre_ms: 10.0, lowcut_hz: 250.0, damp_hz: 7000.0, mix: 0.14, mix_dry: 0.04, follow_s: 1.5 }
+        VerbParams { t60_s: 1.6, pre_ms: 10.0, lowcut_hz: 250.0, damp_hz: 7000.0, mix: 0.14, mix_dry: 0.04, follow_s: 1.5, er: 0.0, er_ms: 30.0 }
     }
 }
 
@@ -125,6 +139,11 @@ pub struct Reverb {
     gains: [f64; N],
     damp: f64,
     lp: [f64; N],
+    // early reflections: the low-cut input's last ER_MAX_MS, the taps' delays in samples, the tone's state
+    er_buf: Vec<f64>,
+    er_pos: usize,
+    er_tap: [usize; 12],
+    er_lp: [f64; 2],
     // follow the music
     music: Vec<f32>,
     music_len: usize,
@@ -147,6 +166,10 @@ impl Reverb {
             gains: [0.0; N],
             damp: 0.0,
             lp: [0.0; N],
+            er_buf: Vec::new(),
+            er_pos: 0,
+            er_tap: [1; 12],
+            er_lp: [0.0; 2],
             music: Vec::new(),
             music_len: 0,
             music_pow: 0.0,
@@ -167,6 +190,10 @@ impl Reverb {
         let kind = if self.p.lowcut_hz > 0.0 { Kind::HighPass } else { Kind::Off };
         self.lowcut.set_ramped(Coefs::design(kind, self.p.lowcut_hz, std::f64::consts::FRAC_1_SQRT_2, 0.0, fs), (0.01 * fs) as u32);
         self.pre_len = (self.p.pre_ms.max(0.0) * 1e-3 * fs).round() as usize;
+        let span = self.p.er_ms.clamp(1.0, ER_MAX_MS) * 1e-3 * fs;
+        for (t, f) in self.er_tap.iter_mut().zip(ER_AT) {
+            *t = ((span * f).round() as usize).max(1);
+        }
     }
 
     /// T60, damping, low cut and mixes change at once; a longer pre-delay than at `prepare` is capped.
@@ -207,6 +234,28 @@ impl Reverb {
             self.pre[(self.pre_pos + n - 1 - self.pre_len) % n]
         };
         let v = self.lowcut.tick(v);
+        let (mut el, mut er) = (0.0, 0.0);
+        if !self.er_buf.is_empty() {
+            let n = self.er_buf.len();
+            self.er_buf[self.er_pos] = v;
+            if self.p.er > 0.0 {
+                for (i, (t, g)) in self.er_tap.iter().zip(ER_GAIN).enumerate() {
+                    let x = self.er_buf[(self.er_pos + n - t.min(&(n - 1))) % n] * g;
+                    if i % 2 == 0 {
+                        el += x;
+                    } else {
+                        er += x;
+                    }
+                }
+                // the tail's tone, and a level that keeps er = 1 about as strong as the tap sum of one side
+                let k = self.p.er * 0.45;
+                self.er_lp[0] = (1.0 - self.damp) * el + self.damp * self.er_lp[0];
+                self.er_lp[1] = (1.0 - self.damp) * er + self.damp * self.er_lp[1];
+                el = self.er_lp[0] * k;
+                er = self.er_lp[1] * k;
+            }
+            self.er_pos = (self.er_pos + 1) % n;
+        }
         let mut u = [v; N];
         for (s, d) in self.diff.iter_mut().enumerate() {
             let mut o = d.read();
@@ -239,7 +288,7 @@ impl Reverb {
             l += w[2 * c];
             r += w[2 * c + 1];
         }
-        (l * norm, r * norm)
+        (l * norm + el, r * norm + er)
     }
 
     #[inline]
@@ -292,6 +341,7 @@ impl Stage for Reverb {
         self.lp_loop = Lines::new(d);
         // room for up to 100 ms of pre-delay without allocating later
         self.pre = vec![0.0; (0.1 * fs) as usize + 2];
+        self.er_buf = vec![0.0; (ER_MAX_MS * 1e-3 * fs) as usize + 2];
         self.music_a = (-1.0 / (MUSIC_TAU_S * fs)).exp();
         let c = Coefs::design(
             if self.p.lowcut_hz > 0.0 { Kind::HighPass } else { Kind::Off },
@@ -324,6 +374,9 @@ impl Stage for Reverb {
         self.diff.iter_mut().for_each(Lines::clear);
         self.lp_loop.clear();
         self.lp = [0.0; N];
+        self.er_buf.iter_mut().for_each(|v| *v = 0.0);
+        self.er_pos = 0;
+        self.er_lp = [0.0; 2];
         self.music_pow = 0.0;
         self.mix_now = self.p.mix_dry;
     }
