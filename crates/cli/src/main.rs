@@ -7,7 +7,7 @@
 //! --autoset NOISE.wav VOICE.wav [--preset P] [--target -18] [--write OUT.toml]: auto setup (build-plan step 8).
 //! Stages run in the order given; --verb (t60 pre lowcut damp mix mixdry follow er erms) comes last, with
 //! --music M.wav as the backing track it follows (without it, mix applies all the time) and
-//! --stereo for a two-channel output. Keys: --eq hp low mid midf pres air; --deess thr freq q ratio max att
+//! --stereo for a two-channel output. Keys: --eq hp low mid midf pres presf air hc; --deess thr freq q ratio max att
 //! rel; --comp thr ratio knee att rel makeup
 //! schp; --exp thr ratio range knee att hold rel det schp; --lim ceil rel look hold tp.
 //!
@@ -61,6 +61,8 @@ fn parse_eq(s: &str) -> Result<EqParams, String> {
             "mid" => p.mid_db = v,
             "midf" => p.mid_hz = v,
             "pres" => p.pres_db = v,
+            "presf" => p.pres_hz = v,
+            "hc" => p.hc_hz = v,
             "air" => p.air_db = v,
             _ => return Err(format!("unknown --eq key {k}")),
         }

@@ -100,12 +100,16 @@ pub struct EqP {
     pub mid: f64,
     pub mid_f: f64,
     pub pres: f64,
+    /// the presence bell's centre, Hz (2000..6000)
+    pub pres_f: f64,
     pub air: f64,
+    /// the high cut, Hz; 20000 is off
+    pub hc: f64,
 }
 
 impl Default for EqP {
     fn default() -> Self {
-        EqP { hp: 80.0, hp_base: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, pres: 1.5, air: 1.0 }
+        EqP { hp: 80.0, hp_base: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, pres: 1.5, pres_f: 3000.0, air: 1.0, hc: 20000.0 }
     }
 }
 
@@ -380,7 +384,7 @@ impl Preset {
     }
 
     pub fn eq_params(&self) -> EqParams {
-        EqParams { hp_hz: self.eq.hp, low_db: self.eq.low, mid_hz: self.eq.mid_f, mid_db: self.eq.mid, pres_db: self.eq.pres, air_db: self.eq.air }
+        EqParams { hp_hz: self.eq.hp, low_db: self.eq.low, mid_hz: self.eq.mid_f, mid_db: self.eq.mid, pres_hz: self.eq.pres_f, pres_db: self.eq.pres, air_db: self.eq.air, hc_hz: self.eq.hc }
     }
 
     pub fn deess_params(&self) -> DeessParams {
