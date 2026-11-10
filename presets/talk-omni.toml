@@ -16,6 +16,7 @@ gate = -54.0
 
 [on]
 denoise = false
+lowcut = true
 eq = true
 deess = true
 exp = true
@@ -26,9 +27,11 @@ lim = true
 [denoise]
 limit = 6.0
 
+[lowcut]
+freq = 80.0
+base = 80.0
+
 [eq]
-hp = 80.0
-hp_base = 80.0
 low = 1.0
 pres = 1.0
 air = 0.0

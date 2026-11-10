@@ -1,7 +1,10 @@
 //! The chain (build-plan.md step 5): the stages in order, two paths, presets.
 //!
-//!   send:    denoise -> EQ -> de-esser -> expander -> compressor -> reverb -> limiter   (to the virtual mic)
-//!   monitor:            EQ -> de-esser -> expander -> compressor -> reverb -> clipper   (to the headphones)
+//!   send:    denoise -> low cut -> EQ -> de-esser -> expander -> compressor -> reverb -> limiter   (to the virtual mic)
+//!   monitor:            low cut -> EQ -> de-esser -> expander -> compressor -> reverb -> clipper   (to the headphones)
+//!
+//! The low cut is a stage of its own (2026-11-10; it was the EQ's first filter): the rumble is gone before the EQ
+//! and the dynamics read the voice. It comes right after denoise, which runs on its own thread with the raw mic.
 //!
 //! The monitor path skips denoise (20 ms) so hearing yourself is quick (routing.md); its stages are a second set
 //! with the same settings. The reverb goes before the limiter so what it adds cannot pass the ceiling.
@@ -21,14 +24,14 @@ use std::time::Instant;
 use stream_mic_denoise::Denoise;
 use stream_mic_dsp::deesser::Deesser;
 use stream_mic_dsp::dynamics::{Compressor, Expander};
-use stream_mic_dsp::eq::Eq;
+use stream_mic_dsp::eq::{Eq, LowCut};
 use stream_mic_dsp::limiter::Limiter;
 use stream_mic_dsp::reverb::Reverb;
 use stream_mic_dsp::Stage;
 
 pub use preset::Preset;
 
-pub const STAGE_NAMES: [&str; 7] = ["denoise", "eq", "deess", "exp", "comp", "verb", "lim"];
+pub const STAGE_NAMES: [&str; 8] = ["denoise", "lowcut", "eq", "deess", "exp", "comp", "verb", "lim"];
 
 /// The monitor's end: straight through up to 0.7 of the ceiling, then bent smoothly towards it (never reaching it).
 /// No look-ahead, so no delay; a peak is rounded off instead of turned down ahead of time.
@@ -47,6 +50,7 @@ fn soft_clip(x: &mut [f32], ceil_db: f64) {
 struct Path {
     /// the monitor: a soft clipper where the send has the limiter
     clip: bool,
+    lowcut: LowCut,
     eq: Eq,
     deess: Deesser,
     exp: Expander,
@@ -63,6 +67,7 @@ impl Path {
         }
         Path {
             clip,
+            lowcut: LowCut::new(p.lowcut.freq),
             eq: Eq::new(p.eq_params()),
             deess: Deesser::new(p.deess_params()),
             exp: Expander::new(p.exp_params()),
@@ -73,6 +78,7 @@ impl Path {
     }
 
     fn prepare(&mut self, fs: f64, block: usize) {
+        self.lowcut.prepare(fs, block);
         self.eq.prepare(fs, block);
         self.deess.prepare(fs, block);
         self.exp.prepare(fs, block);
@@ -82,6 +88,7 @@ impl Path {
     }
 
     fn set(&mut self, p: &Preset) {
+        self.lowcut.set_hz(p.lowcut.freq);
         self.eq.set_params(p.eq_params());
         self.deess.set_params(p.deess_params());
         self.exp.set_params(p.exp_params());
@@ -94,7 +101,7 @@ impl Path {
     }
 
     /// times: seconds spent per stage (index as STAGE_NAMES), added to when given
-    fn process(&mut self, on: &preset::On, x: &mut [f32], music: Option<&[f32]>, mut times: Option<&mut [f64; 7]>) {
+    fn process(&mut self, on: &preset::On, x: &mut [f32], music: Option<&[f32]>, mut times: Option<&mut [f64; 8]>) {
         let mut run = |i: usize, f: &mut dyn FnMut(&mut [f32]), x: &mut [f32]| {
             let t = times.as_ref().map(|_| Instant::now());
             f(x);
@@ -102,30 +109,33 @@ impl Path {
                 tm[i] += t.elapsed().as_secs_f64();
             }
         };
+        if on.lowcut {
+            run(1, &mut |x| self.lowcut.process(x), x);
+        }
         if on.eq {
-            run(1, &mut |x| self.eq.process(x), x);
+            run(2, &mut |x| self.eq.process(x), x);
         }
         if on.deess {
-            run(2, &mut |x| self.deess.process(x), x);
+            run(3, &mut |x| self.deess.process(x), x);
         }
         if on.exp {
-            run(3, &mut |x| self.exp.process(x), x);
+            run(4, &mut |x| self.exp.process(x), x);
         }
         if on.comp {
-            run(4, &mut |x| self.comp.process(x), x);
+            run(5, &mut |x| self.comp.process(x), x);
         }
         if on.verb {
             if let Some(m) = music {
                 self.verb.set_music(m);
             }
-            run(5, &mut |x| self.verb.process(x), x);
+            run(6, &mut |x| self.verb.process(x), x);
         }
         if on.lim {
-            run(6, &mut |x| self.lim.process(x), x);
+            run(7, &mut |x| self.lim.process(x), x);
         } else if self.clip {
             // the monitor without the limiter: the ears still get a ceiling
             let ceil = self.lim.params().ceil_db;
-            run(6, &mut |x| soft_clip(x, ceil), x);
+            run(7, &mut |x| soft_clip(x, ceil), x);
         }
     }
 
@@ -155,7 +165,7 @@ pub struct Chain {
     /// the denoised signal instead of running the model here
     ext: Option<usize>,
     /// seconds per stage since the last `take_times` (when profiling)
-    pub times: Option<[f64; 7]>,
+    pub times: Option<[f64; 8]>,
 }
 
 impl Chain {

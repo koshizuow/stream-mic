@@ -121,7 +121,7 @@ select { width: 100%; background: var(--inset); color: var(--text); border: 1px 
 .row > span { color: var(--muted); }
 
 /* the processing chain, stage by stage */
-.chain { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.chain { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
 .mod {
   position: relative; background: linear-gradient(#22262d, #1c2026); border: 1px solid var(--line); border-radius: 3px; box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
   padding: 9px 8px 8px; cursor: pointer; min-width: 0; text-align: left;

@@ -252,8 +252,13 @@ pub fn apply(shared: &Shared, v: &Value) -> Result<(), String> {
                         err = Some(format!("no EQ style {st}"));
                         c.preset.eq.style = be.style.clone();
                     }
-                } else if !knob_moved && (ce.hp, ce.low, ce.mid, ce.mid_f, ce.mid_q, ce.pres, ce.pres_f, ce.pres_q, ce.air, ce.hc) != (be.hp, be.low, be.mid, be.mid_f, be.mid_q, be.pres, be.pres_f, be.pres_q, be.air, be.hc) {
+                } else if !knob_moved && (ce.low, ce.mid, ce.mid_f, ce.mid_q, ce.pres, ce.pres_f, ce.pres_q, ce.air, ce.hc) != (be.low, be.mid, be.mid_f, be.mid_q, be.pres, be.pres_f, be.pres_q, be.air, be.hc) {
                     c.preset.eq.style = String::new();
+                }
+                // the low cut set by hand: its base moves with it (the Body knob's thinning stays on top)
+                if !knob_moved && c.preset.lowcut.freq != before.preset.lowcut.freq {
+                    let b = c.preset.knobs.body;
+                    c.preset.lowcut.base = c.preset.lowcut.freq - if b < 0.0 { -b * 0.5 } else { 0.0 };
                 }
                 // the preset name is not the page's to change
                 c.preset.name = cfg.preset.name.clone();

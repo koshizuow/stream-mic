@@ -29,7 +29,7 @@ const I18N = {
     voice: '人聲 LUFS', m_pc_long: '電腦聲音 LUFS', chain: '處理鏈',
     chain_note_a: '點一段看細節，亮燈是開著；橘色條是它現在壓了多少（GR）',
     chain_note_b: '處理順序由左到右。點一段在下方看細節；亮燈是開著，橘色條是它現在壓了多少（GR）。',
-    in_phones: '耳機也要', on: '開', eq_note: '拖曳圓點：Low Cut、High Cut 左右移動頻率，Mid、Presence 可以左右移動也可以上下（滑鼠停在點上轉滾輪調 Q），其他上下調整增減。High Cut 拉到最右邊是關。',
+    in_phones: '耳機也要', on: '開', eq_note: '拖曳圓點：High Cut 左右移動頻率，Mid、Presence 可以左右移動也可以上下（滑鼠停在點上轉滾輪調 Q），Low、Air 上下調整增減。High Cut 拉到最右邊是關。Low Cut 是處理鏈上前一段，不在這張圖裡',
     verb_note: '八種人聲用的風格，各自有不同的長度、音色、初期反射和預延遲；空間感旋鈕只調量。改了下面的數值就是自訂。', custom: '自訂',
     verb_note_pub: '照這一家公開的預設數值換算成這裡的參數；reverb 的算法不同，聽起來接近但不會一樣。空間感旋鈕只調量，改了下面的數值就是自訂。',
     fam_ours: '標準', fam_y: 'Y 家', fam_d: 'D 家', fam_f: 'F 家',
@@ -91,7 +91,7 @@ const I18N = {
     voice: 'Voice LUFS', m_pc_long: 'Computer LUFS', chain: 'Chain',
     chain_note_a: 'Click a stage for its details. Lit: on; the amber bar: its gain reduction now',
     chain_note_b: 'Processed left to right. Click a stage for its details below. Lit: on; the amber bar: its gain reduction now.',
-    in_phones: 'In headphones', on: 'On', eq_note: 'Drag a point: Low Cut and High Cut left and right for their frequency, Mid and Presence both ways (the wheel over the point sets its Q), the others up and down. High Cut all the way right is off.',
+    in_phones: 'In headphones', on: 'On', eq_note: 'Drag a point: High Cut left and right for its frequency, Mid and Presence both ways (the wheel over the point sets its Q), Low and Air up and down. High Cut all the way right is off. The Low Cut is the stage before, not in this curve',
     verb_note: 'Eight styles for a voice, each its own length, tone, early reflections and pre-delay; the Space knob sets only how much. Changing a value below makes it custom.', custom: 'Custom',
     verb_note_pub: 'This maker’s published preset values, turned into the settings here; the reverb itself is a different one, so it sounds close, not the same. The Space knob sets only how much; changing a value below makes it custom.',
     fam_ours: 'Standard', fam_y: 'Y', fam_d: 'D', fam_f: 'F',
@@ -287,7 +287,8 @@ const KNOBS = [
 // each stage and its parameters, the engine's names and ranges (crates/chain/src/preset.rs)
 const STAGES = [
   { id: 'denoise', name: 'Denoise', params: [['limit', 'Reduction', 0, 40, 1, 'dB']] },
-  { id: 'eq', name: 'EQ', params: [['hp', 'Low Cut', 40, 200, 5, 'Hz'], ['low', 'Low (200 Hz)', -6, 6, 0.5, 'dB'], ['mid', 'Mid', -6, 6, 0.5, 'dB'], ['mid_f', 'Mid frequency', 200, 1000, 10, 'Hz'], ['mid_q', 'Mid Q', 0.5, 4, 0.05, ''], ['pres', 'Presence', -6, 6, 0.5, 'dB'], ['pres_f', 'Presence frequency', 2000, 6000, 50, 'Hz'], ['pres_q', 'Presence Q', 0.5, 4, 0.05, ''], ['air', 'Air (10 kHz)', -6, 6, 0.5, 'dB'], ['hc', 'High Cut', 2000, 20000, 100, 'Hz']] },
+  { id: 'lowcut', name: 'Low Cut', params: [['freq', 'Frequency', 40, 400, 5, 'Hz']] },
+  { id: 'eq', name: 'EQ', params: [['low', 'Low (200 Hz)', -6, 6, 0.5, 'dB'], ['mid', 'Mid', -6, 6, 0.5, 'dB'], ['mid_f', 'Mid frequency', 200, 1000, 10, 'Hz'], ['mid_q', 'Mid Q', 0.5, 4, 0.05, ''], ['pres', 'Presence', -6, 6, 0.5, 'dB'], ['pres_f', 'Presence frequency', 2000, 6000, 50, 'Hz'], ['pres_q', 'Presence Q', 0.5, 4, 0.05, ''], ['air', 'Air (10 kHz)', -6, 6, 0.5, 'dB'], ['hc', 'High Cut', 2000, 20000, 100, 'Hz']] },
   { id: 'deess', name: 'De-esser', params: [['thr', 'Threshold', -10, 20, 0.5, 'dB'], ['freq', 'Frequency', 4000, 10000, 100, 'Hz'], ['max', 'Range', 3, 12, 1, 'dB']] },
   { id: 'exp', name: 'Gate', params: [['thr', 'Threshold', -80, -20, 1, 'dBFS'], ['ratio', 'Ratio 1:', 1.2, 4, 0.1, ''], ['range', 'Range', 3, 20, 1, 'dB'], ['hold', 'Hold', 0, 300, 10, 'ms'], ['rel', 'Release', 50, 1000, 10, 'ms']] },
   { id: 'comp', name: 'Compressor', params: [['thr', 'Threshold', -40, -6, 0.5, 'dBFS'], ['ratio', 'Ratio', 1, 8, 0.1, ':1'], ['knee', 'Knee', 0, 12, 0.5, 'dB'], ['att', 'Attack', 1, 40, 1, 'ms'], ['rel', 'Release', 30, 400, 5, 'ms'], ['makeup', 'Makeup', 0, 18, 0.5, 'dB']] },
@@ -626,7 +627,7 @@ function biquadDb(kind, f0, q, gain, f) {
   return 20 * Math.log10(mag(b) / mag(a));
 }
 function eqResponse(f, e) {
-  return (e.hp > 0 ? biquadDb('hp', e.hp, EQQ.hp, 0, f) : 0) + biquadDb('ls', EQF.low, EQQ.low, e.low, f) + biquadDb('bell', e.mid_f, e.mid_q ?? EQQ.mid, e.mid, f) +
+  return biquadDb('ls', EQF.low, EQQ.low, e.low, f) + biquadDb('bell', e.mid_f, e.mid_q ?? EQQ.mid, e.mid, f) +
     biquadDb('bell', e.pres_f, e.pres_q ?? EQQ.pres, e.pres, f) + biquadDb('hs', EQF.air, EQQ.air, e.air, f) +
     (e.hc > 0 && e.hc < 20000 ? biquadDb('lp', e.hc, Math.SQRT1_2, 0, f) : 0);
 }
@@ -634,7 +635,7 @@ function eqResponse(f, e) {
 const EQ_HALF = { low: true, air: true };
 function eqPoints() {
   const e = P().eq;
-  return [{ id: 'hp', name: 'Low Cut', f: e.hp, g: 0 }, { id: 'low', name: 'Low', f: EQF.low, g: e.low / 2 }, { id: 'mid', name: 'Mid', f: e.mid_f, g: e.mid }, { id: 'pres', name: 'Presence', f: e.pres_f, g: e.pres }, { id: 'air', name: 'Air', f: EQF.air, g: e.air / 2 }, { id: 'hc', name: 'High Cut', f: Math.min(e.hc, 20000), g: 0 }];
+  return [{ id: 'low', name: 'Low', f: EQF.low, g: e.low / 2 }, { id: 'mid', name: 'Mid', f: e.mid_f, g: e.mid }, { id: 'pres', name: 'Presence', f: e.pres_f, g: e.pres }, { id: 'air', name: 'Air', f: EQF.air, g: e.air / 2 }, { id: 'hc', name: 'High Cut', f: Math.min(e.hc, 20000), g: 0 }];
 }
 function drawEq(c) {
   const [g, w, h] = fitCanvas(c);
@@ -674,10 +675,7 @@ function eqDrag(c) {
   c.addEventListener('pointermove', (e) => {
     if (!hold) return;
     const [x, y] = pos(e);
-    if (hold.id === 'hp') {
-      const f = Math.pow(10, Math.log10(20) + ((x - 30) / (geo.w - 40)) * 3);
-      P().eq.hp = clamp(Math.round(f / 5) * 5, 40, 200);
-    } else if (hold.id === 'hc') {
+    if (hold.id === 'hc') {
       const f = Math.pow(10, Math.log10(20) + ((x - 30) / (geo.w - 40)) * 3);
       P().eq.hc = clamp(Math.round(f / 100) * 100, 2000, 20000);
     } else if (hold.id === 'mid' || hold.id === 'pres') {

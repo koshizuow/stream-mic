@@ -233,3 +233,50 @@ mod tests {
         assert!(max_step < 0.14, "max step {max_step}");
     }
 }
+
+/// The low cut as a stage of its own (the chain's first after denoise, 2026-11-10): a 2nd order Butterworth high
+/// pass, 12 dB/oct; 0 Hz is off. The same filter the EQ has as its first (which the chain no longer uses).
+#[derive(Clone, Debug)]
+pub struct LowCut {
+    hz: f64,
+    fs: f64,
+    prepared: bool,
+    f: Svf,
+}
+
+impl LowCut {
+    pub fn new(hz: f64) -> Self {
+        LowCut { hz, fs: 48000.0, prepared: false, f: Svf::default() }
+    }
+
+    fn coefs(hz: f64, fs: f64) -> Coefs {
+        Coefs::design(if hz > 0.0 { Kind::HighPass } else { Kind::Off }, hz, HP_Q, 0.0, fs)
+    }
+
+    /// A new corner glides there over RAMP_S
+    pub fn set_hz(&mut self, hz: f64) {
+        self.hz = hz;
+        if self.prepared {
+            self.f.set_ramped(Self::coefs(hz, self.fs), (RAMP_S * self.fs).round() as u32);
+        }
+    }
+}
+
+impl Stage for LowCut {
+    fn prepare(&mut self, fs: f64, _max_block: usize) {
+        self.fs = fs;
+        self.prepared = true;
+        self.f.set_now(Self::coefs(self.hz, fs));
+        self.f.reset();
+    }
+
+    fn process(&mut self, x: &mut [f32]) {
+        for s in x.iter_mut() {
+            *s = self.f.tick(*s as f64) as f32;
+        }
+    }
+
+    fn reset(&mut self) {
+        self.f.reset();
+    }
+}

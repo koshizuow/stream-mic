@@ -48,8 +48,8 @@ The engine (`crates/engine`) runs the chain on 128-sample blocks at 48 kHz and s
   which OBS and Discord see as `CABLE Output`. Computer audio comes in through process loopback (Windows 10 2004+),
   leaving stream-mic itself out.
 
-The chain, in order: Denoise (DeepFilterNet3, low-latency model) → EQ (low cut, 200 Hz shelf, 3 kHz bell, 10 kHz
-shelf) → De-esser → Gate (expander) → Compressor → Reverb → Limiter (-1 dBTP). The DSP is in `crates/dsp`, the
+The chain, in order: Denoise (DeepFilterNet3, low-latency model) → Low Cut (12 dB/oct) → EQ (200 Hz shelf, a mid
+bell, a presence bell, 10 kHz shelf, high cut) → De-esser → Gate (expander) → Compressor → Reverb → Limiter (-1 dBTP). The DSP is in `crates/dsp`, the
 chain and the presets in `crates/chain`, the auto setup in `crates/chain/src/autoset.rs`.
 
 ## Building from source

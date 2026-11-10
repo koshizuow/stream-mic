@@ -378,7 +378,7 @@ fn run_chain(inp: &str, out: &str, name: &str, sets: &[(String, f64)], music: Op
     let mut c = Chain::new(p)?;
     c.prepare(fs as f64, block);
     c.set_bypass(bypass);
-    c.times = Some([0.0; 7]);
+    c.times = Some([0.0; 8]);
     let (mut s, mut mon) = (vec![0f32; x.len()], vec![0f32; x.len()]);
     let period = std::time::Duration::from_secs_f64(block as f64 / fs as f64);
     let start = Instant::now();

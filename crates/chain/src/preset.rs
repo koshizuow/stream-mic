@@ -37,6 +37,7 @@ impl Default for Knobs {
 #[serde(default)]
 pub struct On {
     pub denoise: bool,
+    pub lowcut: bool,
     pub eq: bool,
     pub deess: bool,
     pub exp: bool,
@@ -47,7 +48,7 @@ pub struct On {
 
 impl Default for On {
     fn default() -> Self {
-        On { denoise: false, eq: true, deess: true, exp: true, comp: true, verb: false, lim: true }
+        On { denoise: false, lowcut: true, eq: true, deess: true, exp: true, comp: true, verb: false, lim: true }
     }
 }
 
@@ -55,13 +56,14 @@ impl On {
     /// What the monitor (the headphones) gets by default: every stage that works sample by sample, so no delay. Not
     /// denoise (20 ms and more) and not the limiter's look-ahead (2 ms): a soft clipper guards the ears instead.
     pub fn monitor_default() -> Self {
-        On { denoise: false, eq: true, deess: true, exp: true, comp: true, verb: true, lim: false }
+        On { denoise: false, lowcut: true, eq: true, deess: true, exp: true, comp: true, verb: true, lim: false }
     }
 
     /// on in both
     pub fn and(&self, o: &On) -> On {
         On {
             denoise: self.denoise && o.denoise,
+            lowcut: self.lowcut && o.lowcut,
             eq: self.eq && o.eq,
             deess: self.deess && o.deess,
             exp: self.exp && o.exp,
@@ -91,12 +93,24 @@ impl Default for DenoiseP {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
+pub struct LowCutP {
+    /// the corner, Hz
+    pub freq: f64,
+    /// the corner with the Body knob at 0 or above (thinner turns raise it)
+    pub base: f64,
+}
+
+impl Default for LowCutP {
+    fn default() -> Self {
+        LowCutP { freq: 80.0, base: 80.0 }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
 pub struct EqP {
     /// the style the values came from (EQ_STYLES), "" when they were changed by hand
     pub style: String,
-    pub hp: f64,
-    /// the low cut with the body knob at 0 or above (thinner turns raise it)
-    pub hp_base: f64,
     pub low: f64,
     /// the mid bell's gain, dB, and its centre, Hz (200..1000)
     pub mid: f64,
@@ -117,7 +131,7 @@ pub struct EqP {
 
 impl Default for EqP {
     fn default() -> Self {
-        EqP { style: String::new(), hp: 80.0, hp_base: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 1.5, pres_f: 3000.0, pres_q: 1.0, air: 1.0, hc: 20000.0, low_base: 0.0, pres_base: 1.5 }
+        EqP { style: String::new(), low: 0.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 1.5, pres_f: 3000.0, pres_q: 1.0, air: 1.0, hc: 20000.0, low_base: 0.0, pres_base: 1.5 }
     }
 }
 
@@ -323,6 +337,7 @@ pub struct Preset {
     #[serde(default = "monitor_default")]
     pub monitor: On,
     pub denoise: DenoiseP,
+    pub lowcut: LowCutP,
     pub eq: EqP,
     pub deess: DeessP,
     pub exp: ExpP,
@@ -342,6 +357,7 @@ impl Default for Preset {
             on: On::default(),
             monitor: On::monitor_default(),
             denoise: DenoiseP::default(),
+            lowcut: LowCutP::default(),
             eq: EqP::default(),
             deess: DeessP::default(),
             exp: ExpP::default(),
@@ -391,7 +407,7 @@ impl Preset {
                 // on top of the style's (or the preset's) own Low and Presence
                 self.eq.low = half(self.eq.low_base + v / 100.0 * 4.0).clamp(-6.0, 6.0);
                 self.eq.pres = half(self.eq.pres_base - v / 100.0 * 2.0).clamp(-6.0, 6.0);
-                self.eq.hp = if v < 0.0 { ((self.eq.hp_base - v * 0.5) / 5.0).round() * 5.0 } else { self.eq.hp_base };
+                self.lowcut.freq = if v < 0.0 { ((self.lowcut.base - v * 0.5) / 5.0).round() * 5.0 } else { self.lowcut.base };
             }
             "space" => {
                 // the knob is the reverb with the music; without it (a cappella, talking between songs) a third,
@@ -442,8 +458,10 @@ impl Preset {
         let Some(st) = eq_style(name) else { return false };
         let e = &mut self.eq;
         e.style = st.name.to_string();
-        e.hp = st.hp;
-        e.hp_base = st.hp;
+        self.lowcut.freq = st.hp;
+        self.lowcut.base = st.hp;
+        self.on.lowcut = true;
+        let e = &mut self.eq;
         e.low_base = st.low;
         e.mid = st.mid;
         e.mid_f = st.mid_f;
@@ -475,7 +493,8 @@ impl Preset {
     }
 
     pub fn eq_params(&self) -> EqParams {
-        EqParams { hp_hz: self.eq.hp, low_db: self.eq.low, mid_hz: self.eq.mid_f, mid_db: self.eq.mid, mid_q: self.eq.mid_q, pres_hz: self.eq.pres_f, pres_db: self.eq.pres, pres_q: self.eq.pres_q, air_db: self.eq.air, hc_hz: self.eq.hc }
+        // the low cut is its own stage now (Preset::lowcut)
+        EqParams { hp_hz: 0.0, low_db: self.eq.low, mid_hz: self.eq.mid_f, mid_db: self.eq.mid, mid_q: self.eq.mid_q, pres_hz: self.eq.pres_f, pres_db: self.eq.pres, pres_q: self.eq.pres_q, air_db: self.eq.air, hc_hz: self.eq.hc }
     }
 
     pub fn deess_params(&self) -> DeessParams {

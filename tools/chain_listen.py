@@ -42,7 +42,7 @@ def plugin_chain(p):
         st.append(lambda: LadspaPlugin(DF_LIB, "deep_filter_mono", FS, {"Attenuation Limit": p["denoise"]["limit"]}, BLOCK))
     e = p["eq"]
     st.append(lambda: LV2Plugin("http://calf.sourceforge.net/plugins/Equalizer8Band", FS, {
-        "hp_active": 1, "hp_freq": e["hp"], "hp_mode": 0,
+        "hp_active": 1 if on.get("lowcut", True) else 0, "hp_freq": p["lowcut"]["freq"], "hp_mode": 0,
         "ls_active": 1, "ls_level": db(e["low"]), "ls_freq": 200,
         "p1_active": 1, "p1_level": db(e["pres"]), "p1_freq": 3000, "p1_q": 1.0,
         "hs_active": 1, "hs_level": db(e["air"]), "hs_freq": 10000}, BLOCK))

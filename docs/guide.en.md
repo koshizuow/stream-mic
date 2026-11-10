@@ -106,9 +106,14 @@ The chain shows the order the voice goes through:
   - **In headphones** decides whether you hear the stage in your headphones. A stage that adds latency, such as
     Denoise, can be kept out of the headphones and applied only to what goes out.
 
-**EQ** has four points:
-- **Low Cut:** drag it left or right to change its frequency.
-- **Low** (200 Hz), **Presence** (3 kHz) and **Air** (10 kHz): drag them up or down to boost or cut.
+**Low Cut** is a stage of its own before the EQ: it takes out the rumble below about 80 Hz (12 dB per octave). Set
+its frequency in its details. Turning Body towards thinner raises it.
+
+**EQ** has five points:
+- **Low** (200 Hz) and **Air** (10 kHz): drag them up or down to boost or cut.
+- **Mid** and **Presence**: up or down to boost or cut, left or right for the frequency; the mouse wheel over the
+  point sets its Q.
+- **High Cut:** drag it left or right; all the way right is off.
 
 The curve is the filters' actual response:
 - Low and Air are shelves with a Q of 0.707. At its corner frequency, a shelf has half its gain, so the point sits
