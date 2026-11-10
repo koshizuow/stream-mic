@@ -221,20 +221,23 @@ pub struct VerbStyle {
     pub gain: f64,
 }
 
-/// The styles of TC-Helicon VoiceTone R1 (its manual's table: length, tone, initial reflections, pre-delay), in its
-/// order. Length: shortest 0.45 s, short 0.75-0.9, medium 1.5-1.9, longest 3; tone: bright 11 kHz damping, medium
+/// Our reverb styles: TC-Helicon VoiceTone R1's manual table (length, tone, initial reflections, pre-delay, words
+/// only, no numbers) was the reference for what each is, and its order; the numbers are ours. Length: shortest 0.45 s, short 0.75-0.9, medium 1.5-1.9, longest 3; tone: bright 11 kHz damping, medium
 /// 6.5-7, dark 3.5; reflections: low 0.12, medium 0.35, high 0.6-0.7; pre-delay (on top of the tail's own 29 ms,
 /// which the reflections come before): none 0, short 10, medium 20-25, "yes" 30, long 60 ms. The vocal ranges and
-/// low cuts as in io44-control's table (mixing guides: lead 0.8-2 s; pre-delay room 5-20, plate 15-35, hall 20-60).
+/// low cuts first from mixing guides (lead 0.8-2 s; pre-delay room 5-20, plate 15-35, hall 20-60); checked 2026-11-10
+/// against Yamaha SPX2000's and Dragonfly Reverb's published presets (design notes reverb-styles.md): the plate made
+/// 2.0 s (theirs 1.8-2.44 s, R1 has it as long as the hall) and the low cuts brought to 100-200 Hz (theirs mostly
+/// none or 50-140 Hz; the smallest space keeps 250).
 pub const VERB_STYLES: [VerbStyle; 8] = [
-    VerbStyle { name: "hall", size: 1.8, pre: 25.0, lowcut: 180.0, damp: 6500.0, er: 0.35, er_ms: 45.0, gain: 1.00 },
-    VerbStyle { name: "plate", size: 1.5, pre: 20.0, lowcut: 350.0, damp: 11000.0, er: 0.12, er_ms: 25.0, gain: 0.96 },
-    VerbStyle { name: "theatre", size: 1.9, pre: 30.0, lowcut: 120.0, damp: 3500.0, er: 0.12, er_ms: 50.0, gain: 1.08 },
-    VerbStyle { name: "club", size: 0.9, pre: 10.0, lowcut: 200.0, damp: 6500.0, er: 0.6, er_ms: 30.0, gain: 1.07 },
-    VerbStyle { name: "room", size: 0.75, pre: 0.0, lowcut: 300.0, damp: 11000.0, er: 0.6, er_ms: 20.0, gain: 1.03 },
-    VerbStyle { name: "studio", size: 0.85, pre: 0.0, lowcut: 200.0, damp: 7000.0, er: 0.35, er_ms: 25.0, gain: 1.09 },
-    VerbStyle { name: "ambience", size: 0.45, pre: 0.0, lowcut: 400.0, damp: 11000.0, er: 0.7, er_ms: 12.0, gain: 1.07 },
-    VerbStyle { name: "arena", size: 3.0, pre: 60.0, lowcut: 150.0, damp: 6000.0, er: 0.35, er_ms: 80.0, gain: 0.95 },
+    VerbStyle { name: "hall", size: 1.8, pre: 25.0, lowcut: 150.0, damp: 6500.0, er: 0.35, er_ms: 45.0, gain: 1.00 },
+    VerbStyle { name: "plate", size: 2.0, pre: 20.0, lowcut: 150.0, damp: 11000.0, er: 0.12, er_ms: 25.0, gain: 0.90 },
+    VerbStyle { name: "theatre", size: 1.9, pre: 30.0, lowcut: 100.0, damp: 3500.0, er: 0.12, er_ms: 50.0, gain: 1.08 },
+    VerbStyle { name: "club", size: 0.9, pre: 10.0, lowcut: 150.0, damp: 6500.0, er: 0.6, er_ms: 30.0, gain: 1.07 },
+    VerbStyle { name: "room", size: 0.75, pre: 0.0, lowcut: 200.0, damp: 11000.0, er: 0.6, er_ms: 20.0, gain: 1.03 },
+    VerbStyle { name: "studio", size: 0.85, pre: 0.0, lowcut: 150.0, damp: 7000.0, er: 0.35, er_ms: 25.0, gain: 1.09 },
+    VerbStyle { name: "ambience", size: 0.45, pre: 0.0, lowcut: 250.0, damp: 11000.0, er: 0.7, er_ms: 12.0, gain: 1.07 },
+    VerbStyle { name: "arena", size: 3.0, pre: 60.0, lowcut: 100.0, damp: 6000.0, er: 0.35, er_ms: 80.0, gain: 0.95 },
 ];
 
 pub fn verb_style(name: &str) -> Option<VerbStyle> {
