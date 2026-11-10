@@ -96,13 +96,16 @@ pub struct EqP {
     /// the low cut with the body knob at 0 or above (thinner turns raise it)
     pub hp_base: f64,
     pub low: f64,
+    /// the mid bell's gain, dB, and its centre, Hz (200..1000)
+    pub mid: f64,
+    pub mid_f: f64,
     pub pres: f64,
     pub air: f64,
 }
 
 impl Default for EqP {
     fn default() -> Self {
-        EqP { hp: 80.0, hp_base: 80.0, low: 0.0, pres: 1.5, air: 1.0 }
+        EqP { hp: 80.0, hp_base: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, pres: 1.5, air: 1.0 }
     }
 }
 
@@ -377,7 +380,7 @@ impl Preset {
     }
 
     pub fn eq_params(&self) -> EqParams {
-        EqParams { hp_hz: self.eq.hp, low_db: self.eq.low, pres_db: self.eq.pres, air_db: self.eq.air }
+        EqParams { hp_hz: self.eq.hp, low_db: self.eq.low, mid_hz: self.eq.mid_f, mid_db: self.eq.mid, pres_db: self.eq.pres, air_db: self.eq.air }
     }
 
     pub fn deess_params(&self) -> DeessParams {

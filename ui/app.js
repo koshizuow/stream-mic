@@ -29,7 +29,7 @@ const I18N = {
     voice: '人聲 LUFS', m_pc_long: '電腦聲音 LUFS', chain: '處理鏈',
     chain_note_a: '點一段看細節，亮燈是開著；橘色條是它現在壓了多少（GR）',
     chain_note_b: '處理順序由左到右。點一段在下方看細節；亮燈是開著，橘色條是它現在壓了多少（GR）。',
-    in_phones: '耳機也要', on: '開', eq_note: '拖曳圓點：Low Cut 左右移動頻率，其他上下調整增減。',
+    in_phones: '耳機也要', on: '開', eq_note: '拖曳圓點：Low Cut 左右移動頻率，Mid 可以左右移動也可以上下，其他上下調整增減。',
     verb_note: '風格依 TC-Helicon R1 的分類：各自的長度、音色、初期反射、預延遲；空間感旋鈕只調量。改了下面的數值就是自訂。', custom: '自訂',
     details: '細節', pick_stage: '在上面的處理鏈點一段。', drag_too: '；門檻也可以在上面的圖拖',
     pc: '電腦聲音', lb_on: '送進虛擬麥克風', lb_db: '送出的音量', pc_db: '耳機裡的音量',
@@ -86,7 +86,7 @@ const I18N = {
     voice: 'Voice LUFS', m_pc_long: 'Computer LUFS', chain: 'Chain',
     chain_note_a: 'Click a stage for its details. Lit: on; the amber bar: its gain reduction now',
     chain_note_b: 'Processed left to right. Click a stage for its details below. Lit: on; the amber bar: its gain reduction now.',
-    in_phones: 'In headphones', on: 'On', eq_note: 'Drag a point: Low Cut left and right for its frequency, the others up and down.',
+    in_phones: 'In headphones', on: 'On', eq_note: 'Drag a point: Low Cut left and right for its frequency, Mid both ways, the others up and down.',
     verb_note: 'Styles after TC-Helicon R1: each its own length, tone, early reflections and pre-delay; the Space knob sets only how much. Changing a value below makes it custom.', custom: 'Custom',
     details: 'Details', pick_stage: 'Click a stage in the chain above.', drag_too: '; the threshold can be dragged in the scope too',
     pc: 'Computer audio', lb_on: 'Send to the virtual mic', lb_db: 'Send level', pc_db: 'In headphones',
@@ -185,7 +185,7 @@ const KNOBS = [
 // each stage and its parameters, the engine's names and ranges (crates/chain/src/preset.rs)
 const STAGES = [
   { id: 'denoise', name: 'Denoise', params: [['limit', 'Reduction', 0, 40, 1, 'dB']] },
-  { id: 'eq', name: 'EQ', params: [['hp', 'Low Cut', 40, 200, 5, 'Hz'], ['low', 'Low (200 Hz)', -6, 6, 0.5, 'dB'], ['pres', 'Presence (3 kHz)', -6, 6, 0.5, 'dB'], ['air', 'Air (10 kHz)', -6, 6, 0.5, 'dB']] },
+  { id: 'eq', name: 'EQ', params: [['hp', 'Low Cut', 40, 200, 5, 'Hz'], ['low', 'Low (200 Hz)', -6, 6, 0.5, 'dB'], ['mid', 'Mid', -6, 6, 0.5, 'dB'], ['mid_f', 'Mid frequency', 200, 1000, 10, 'Hz'], ['pres', 'Presence (3 kHz)', -6, 6, 0.5, 'dB'], ['air', 'Air (10 kHz)', -6, 6, 0.5, 'dB']] },
   { id: 'deess', name: 'De-esser', params: [['thr', 'Threshold', -10, 20, 0.5, 'dB'], ['freq', 'Frequency', 4000, 10000, 100, 'Hz'], ['max', 'Range', 3, 12, 1, 'dB']] },
   { id: 'exp', name: 'Gate', params: [['thr', 'Threshold', -80, -20, 1, 'dBFS'], ['ratio', 'Ratio 1:', 1.2, 4, 0.1, ''], ['range', 'Range', 3, 20, 1, 'dB'], ['hold', 'Hold', 0, 300, 10, 'ms'], ['rel', 'Release', 50, 1000, 10, 'ms']] },
   { id: 'comp', name: 'Compressor', params: [['thr', 'Threshold', -40, -6, 0.5, 'dBFS'], ['ratio', 'Ratio', 1, 8, 0.1, ':1'], ['knee', 'Knee', 0, 12, 0.5, 'dB'], ['att', 'Attack', 1, 40, 1, 'ms'], ['rel', 'Release', 30, 400, 5, 'ms'], ['makeup', 'Makeup', 0, 18, 0.5, 'dB']] },
@@ -501,10 +501,10 @@ function drawScope() {
 }
 
 // ------------------------------------------------------------------ the EQ as a curve: Low Cut moves left and right, the
-// three others up and down. The curve is the engine's own response (crates/dsp/src/eq.rs: Butterworth high pass, shelves at
-// 200 Hz and 10 kHz with Q 0.707, a 3 kHz bell with Q 1; Simper SVFs, which are the RBJ biquads at 48 kHz). A shelf's
+// Mid both ways (its frequency and its gain), the three others up and down. The curve is the engine's own response (crates/dsp/src/eq.rs: Butterworth high pass, shelves at
+// 200 Hz and 10 kHz with Q 0.707, the mid bell (200 Hz-1 kHz) with Q 1.4, a 3 kHz bell with Q 1; Simper SVFs, which are the RBJ biquads at 48 kHz). A shelf's
 // point sits on the curve at its corner, where it has half its gain, as in most EQs.
-const EQF = { low: 200, pres: 3000, air: 10000 }, EQQ = { hp: Math.SQRT1_2, low: Math.SQRT1_2, pres: 1, air: Math.SQRT1_2 };
+const EQF = { low: 200, pres: 3000, air: 10000 }, EQQ = { hp: Math.SQRT1_2, low: Math.SQRT1_2, mid: 1.4, pres: 1, air: Math.SQRT1_2 };
 const FS = 48000;
 function biquadDb(kind, f0, q, gain, f) {
   const A = Math.pow(10, gain / 40), w0 = 2 * Math.PI * f0 / FS, cw = Math.cos(w0), al = Math.sin(w0) / (2 * q);
@@ -521,14 +521,14 @@ function biquadDb(kind, f0, q, gain, f) {
   return 20 * Math.log10(mag(b) / mag(a));
 }
 function eqResponse(f, e) {
-  return (e.hp > 0 ? biquadDb('hp', e.hp, EQQ.hp, 0, f) : 0) + biquadDb('ls', EQF.low, EQQ.low, e.low, f) +
+  return (e.hp > 0 ? biquadDb('hp', e.hp, EQQ.hp, 0, f) : 0) + biquadDb('ls', EQF.low, EQQ.low, e.low, f) + biquadDb('bell', e.mid_f, EQQ.mid, e.mid, f) +
     biquadDb('bell', EQF.pres, EQQ.pres, e.pres, f) + biquadDb('hs', EQF.air, EQQ.air, e.air, f);
 }
 // shelves show (and are dragged by) half their gain: the point stays on the curve
 const EQ_HALF = { low: true, air: true };
 function eqPoints() {
   const e = P().eq;
-  return [{ id: 'hp', name: 'Low Cut', f: e.hp, g: 0 }, { id: 'low', name: 'Low', f: EQF.low, g: e.low / 2 }, { id: 'pres', name: 'Presence', f: EQF.pres, g: e.pres }, { id: 'air', name: 'Air', f: EQF.air, g: e.air / 2 }];
+  return [{ id: 'hp', name: 'Low Cut', f: e.hp, g: 0 }, { id: 'low', name: 'Low', f: EQF.low, g: e.low / 2 }, { id: 'mid', name: 'Mid', f: e.mid_f, g: e.mid }, { id: 'pres', name: 'Presence', f: EQF.pres, g: e.pres }, { id: 'air', name: 'Air', f: EQF.air, g: e.air / 2 }];
 }
 function drawEq(c) {
   const [g, w, h] = fitCanvas(c);
@@ -554,6 +554,8 @@ function drawEq(c) {
   }
   return { fx, dy, w, h };
 }
+// what a dragged point changes (the mid point: its frequency and its gain)
+const eqChange = (id) => (id === 'mid' ? { mid: P().eq.mid, mid_f: P().eq.mid_f } : { [id]: P().eq[id] });
 function eqDrag(c) {
   let geo = drawEq(c), hold = null;
   const send = throttled((ch) => post({ preset: { eq: ch } }));
@@ -569,11 +571,15 @@ function eqDrag(c) {
     if (hold.id === 'hp') {
       const f = Math.pow(10, Math.log10(20) + ((x - 30) / (geo.w - 40)) * 3);
       P().eq.hp = clamp(Math.round(f / 5) * 5, 40, 200);
+    } else if (hold.id === 'mid') {
+      const f = Math.pow(10, Math.log10(20) + ((x - 30) / (geo.w - 40)) * 3);
+      P().eq.mid_f = clamp(Math.round(f / 10) * 10, 200, 1000);
+      P().eq.mid = clamp(Math.round(((geo.h / 2 - y) / (geo.h / 2 - 14)) * 12 * 2) / 2, -6, 6);
     } else P().eq[hold.id] = clamp(Math.round(((geo.h / 2 - y) / (geo.h / 2 - 14)) * 12 * (EQ_HALF[hold.id] ? 2 : 1) * 2) / 2, -6, 6);
     geo = drawEq(c);
-    send.move({ [hold.id]: P().eq[hold.id] });
+    send.move(eqChange(hold.id));
   });
-  c.addEventListener('pointerup', () => { if (hold) send.end({ [hold.id]: P().eq[hold.id] }); hold = null; holding.delete('eq'); });
+  c.addEventListener('pointerup', () => { if (hold) send.end(eqChange(hold.id)); hold = null; holding.delete('eq'); });
   new ResizeObserver(() => (geo = drawEq(c))).observe(c);
 }
 
