@@ -171,6 +171,85 @@ function throttled(send) {
   return { move: (v) => { last = v; if (!tmr) tmr = setTimeout(go, 60); }, end: (v) => { last = v; clearTimeout(tmr); go(); } };
 }
 
+// ------------------------------------------------------------------ typing a value
+// Every value shown next to a slider or under a knob can be
+// clicked (or focused and Enter) and typed: Enter sends, Esc leaves it, Tab sends and goes to the next one. The
+// writing is loose: "-0.5", "+2", "2 dB", "3k", "3.5 kHz", "350", "40 ms", "0.2 s", "50%", and for a pan "C", "L20",
+// "R35". A value out of range goes to the nearest end, one between steps to the nearest step; the field flashes
+// amber when it was changed so, red when it could not be read (nothing is sent then). What is shown afterwards is what
+// the server took. The same as stream-mic's ui/app.js.
+
+function parseNum(text, o = {}) {
+  const s = String(text).trim().toLowerCase().replace(/[−－–]/g, '-').replace(/＋/g, '+').replace(/[，。]/g, '.').replace(/\s+/g, ' ');
+  if (o.pan) {
+    if (/^(c|center|centre|中)$/.test(s)) return 0;
+    const p = s.match(/^([lr左右])\s*(\d+(?:\.\d+)?)\s*%?$/);
+    if (p) return ((p[1] === 'l' || p[1] === '左') ? -1 : 1) * Math.min(100, +p[2]) / 100;
+  }
+  const m = s.match(/^([+-]?(?:\d+\.?\d*|\.\d+))\s*(khz|k|hz|db|ms|s|%|:1)?$/);
+  if (!m) return NaN;
+  let v = +m[1];
+  const u = m[2] || '';
+  if (u === 'k' || u === 'khz') v *= 1000;
+  if (u === 's' && o.unit === 'ms') v *= 1000;
+  if (o.pan && Math.abs(v) > 1) v /= 100;   // "-20" for L20
+  return v;
+}
+const isEditing = (el) => !!el && el.dataset.editing === '1';
+function plainNum(v, o) {
+  if (v === undefined || v === null || !isFinite(v)) return '';
+  if (o.pan) return Math.abs(v) < 0.005 ? 'C' : (v < 0 ? 'L' : 'R') + Math.round(Math.abs(v) * 100);
+  return String(+(+v).toFixed(3));
+}
+function snapNum(v, o) {
+  if (o.snap) v = o.snap(v);
+  else if (o.step) v = Math.round(v / o.step) * o.step;
+  v = Math.max(o.lo, Math.min(o.hi, v));
+  return +v.toFixed(6);
+}
+function flash(el, cls) { el.classList.remove('adjusted', 'bad'); void el.offsetWidth; el.classList.add(cls); setTimeout(() => el.classList.remove(cls), 900); }
+// el: the element showing the value; o: { lo, hi, step or snap(v), get(): the value now, apply(v), pan, unit }
+function numEdit(el, o) {
+  if (!el || el.dataset.numed) return;
+  el.dataset.numed = '1';
+  el.classList.add('numed');
+  el.tabIndex = 0;
+  const start = () => {
+    if (isEditing(el)) return;
+    el.dataset.editing = '1';
+    const was = el.textContent, inp = document.createElement('input');
+    inp.className = 'numin'; inp.value = plainNum(o.get(), o); inp.spellcheck = false;
+    el.textContent = ''; el.appendChild(inp); inp.focus(); inp.select();
+    let done = false;
+    const stop = (text) => { done = true; delete el.dataset.editing; inp.remove(); el.textContent = text; };
+    const commit = () => {
+      if (done) return true;
+      const v = parseNum(inp.value, o);
+      if (inp.value.trim() === '' || !isFinite(v)) { stop(was); flash(el, 'bad'); return false; }
+      const x = snapNum(v, o);
+      stop(was); o.apply(x);
+      if (Math.abs(x - v) > 1e-9) flash(el, 'adjusted');
+      return true;
+    };
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); el.focus(); }
+      else if (e.key === 'Escape') { e.preventDefault(); stop(was); el.focus(); }
+      else if (e.key === 'Tab') {
+        e.preventDefault(); commit();
+        const all = [...document.querySelectorAll('.numed')].filter((x) => x.offsetParent !== null);
+        const next = all[(all.indexOf(el) + (e.shiftKey ? all.length - 1 : 1)) % all.length];
+        if (next) next.dispatchEvent(new Event('numedit'));
+      }
+      e.stopPropagation();
+    });
+    inp.addEventListener('blur', () => commit());
+    inp.addEventListener('pointerdown', (e) => e.stopPropagation());
+  };
+  el.addEventListener('click', start);
+  el.addEventListener('numedit', start);
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !isEditing(el)) { e.preventDefault(); start(); } });
+}
+
 // ------------------------------------------------------------------ the knobs, the modes, the stages
 const MODE_ICON = { 'talk-omni': '◎', 'talk-directional': '◉', sing: '♪' };
 const modeName = (b) => (I18N[LANG]['p_' + b.name.replace(/-/g, '_')] ? t('p_' + b.name.replace(/-/g, '_')) : b.label);
@@ -668,7 +747,11 @@ function buildKnobs() {
     el.addEventListener('pointermove', (e) => { if (y0 !== null) set(v0 + ((y0 - e.clientY) * (k.max() - k.min)) / (e.shiftKey ? 600 : 160)); });
     el.addEventListener('pointerup', (e) => { if (y0 !== null) set(v0 + ((y0 - e.clientY) * (k.max() - k.min)) / (e.shiftKey ? 600 : 160), true); y0 = null; holding.delete('knob:' + k.id); });
     el.addEventListener('wheel', (e) => { e.preventDefault(); set(P().knobs[k.id] - Math.sign(e.deltaY) * (k.max() - k.min) / 50, true); }, { passive: false });
-    el.addEventListener('keydown', (e) => { const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (d) { e.preventDefault(); set(P().knobs[k.id] + d * (k.max() - k.min) / 50, true); } });
+    el.addEventListener('keydown', (e) => { if (e.target !== el) return; const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (d) { e.preventDefault(); set(P().knobs[k.id] + d * (k.max() - k.min) / 50, true); } });
+    // the value under it: typed as the knob's own number (Gate in dB)
+    const kv = el.querySelector('.kval');
+    kv.addEventListener('pointerdown', (e) => e.stopPropagation());
+    numEdit(kv, { lo: k.min, get hi() { return k.max(); }, step: 1, get: () => P().knobs[k.id], apply: (x) => { setKnob(k.id, x).end(x); knobsUI(); } });
   }
 }
 function knobsUI() {
@@ -676,7 +759,7 @@ function knobsUI() {
     const k = KNOBS.find((x) => x.id === el.dataset.k), v = P().knobs[k.id];
     el.querySelector('.sv').innerHTML = knobSvg(v, k);
     el.querySelector('.kname').textContent = k.name();
-    el.querySelector('.kval').textContent = k.word(v) + (k.id === 'gate' && M.floor > -110 ? ' · ' + t('floor_tick') + ' ' + fmtDb(M.floor).replace('.0', '') : '');
+    if (!isEditing(el.querySelector('.kval'))) el.querySelector('.kval').textContent = k.word(v) + (k.id === 'gate' && M.floor > -110 ? ' · ' + t('floor_tick') + ' ' + fmtDb(M.floor).replace('.0', '') : '');
     el.classList.toggle('dim', (k.id === 'denoise' || k.id === 'space') && v === 0);
     el.setAttribute('aria-label', k.name());
     el.setAttribute('aria-valuenow', v);
@@ -691,6 +774,8 @@ function buildSliders() {
     const id = inp.dataset.k;
     inp.addEventListener('input', () => { holding.add('sl:' + id); setKnob(id, +inp.value).move(+inp.value); slidersUI(); });
     inp.addEventListener('change', () => { setKnob(id, +inp.value).end(+inp.value); holding.delete('sl:' + id); });
+    const k = KNOBS.find((x) => x.id === id);
+    numEdit(inp.nextElementSibling, { lo: k.min, get hi() { return k.max(); }, step: 1, get: () => P().knobs[id], apply: (x) => { setKnob(id, x).end(x); slidersUI(); } });
   }
 }
 function slidersUI() {
@@ -699,7 +784,7 @@ function slidersUI() {
     inp.min = k.min; inp.max = k.max();
     if (!holding.has('sl:' + k.id)) inp.value = P().knobs[k.id];
     inp.previousElementSibling.textContent = k.name();
-    inp.nextElementSibling.textContent = k.word(P().knobs[k.id]);
+    if (!isEditing(inp.nextElementSibling)) inp.nextElementSibling.textContent = k.word(P().knobs[k.id]);
   }
 }
 
@@ -748,6 +833,8 @@ function buildDetail() {
     const send = throttled((v) => post({ preset: { [s.id]: { [id]: v } } }));
     inp.addEventListener('input', () => { holding.add('p:' + id); P()[s.id][id] = +inp.value; row.querySelector('output').textContent = pText(s.id, id, inp.value, q); send.move(+inp.value); });
     inp.addEventListener('change', () => { send.end(+inp.value); holding.delete('p:' + id); });
+    numEdit(row.querySelector('output'), { lo: q[2], hi: q[3], step: q[4], unit: q[5] === 'ms' ? 'ms' : undefined, get: () => P()[s.id][id],
+      apply: (x) => { P()[s.id][id] = x; post({ preset: { [s.id]: { [id]: x } } }); detailUI(); } });
   }
   if (s.id === 'eq') eqDrag($('eqc'));
   if (s.id === 'verb') for (const b of $('vstyles').children) b.onclick = () => post({ preset: { verb: { style: b.dataset.v } } });
@@ -764,7 +851,7 @@ function detailUI() {
     row.hidden = row.dataset.only === 'sing' && !sing();
     if (s.id === 'verb' && id === 'mix') row.querySelector('span').textContent = sing() ? 'Mix (with backing)' : 'Mix';
     if (!holding.has('p:' + id)) inp.value = v;
-    row.querySelector('output').textContent = pText(s.id, id, v, q);
+    if (!isEditing(row.querySelector('output'))) row.querySelector('output').textContent = pText(s.id, id, v, q);
   }
   if (s.id === 'eq' && !holding.has('eq')) drawEq($('eqc'));
   if (s.id === 'verb') {
@@ -796,6 +883,7 @@ function level(id, key) {
   const inp = $(id), send = throttled((v) => post({ [key]: v }));
   inp.addEventListener('input', () => { holding.add(id); S[key] = +inp.value; inp.nextElementSibling.textContent = fmtDb(+inp.value) + ' dB'; send.move(+inp.value); });
   inp.addEventListener('change', () => { send.end(+inp.value); holding.delete(id); });
+  numEdit(inp.nextElementSibling, { lo: +inp.min, hi: +inp.max, step: +inp.step, get: () => S[key], apply: (x) => { S[key] = x; post({ [key]: x }); routingUI(); } });
 }
 function wireRouting() {
   $('lbOn').onclick = () => post({ loopback: !S.loopback });
@@ -810,7 +898,7 @@ function routingUI() {
   $('lbRow').classList.toggle('dim', !S.loopback);
   for (const [id, key] of [['lbDb', 'loopback_db'], ['pcDb', 'pc_db'], ['monDb', 'monitor_db']]) {
     if (!holding.has(id)) $(id).value = S[key];
-    $(id).nextElementSibling.textContent = fmtDb(S[key]) + ' dB';
+    if (!isEditing($(id).nextElementSibling)) $(id).nextElementSibling.textContent = fmtDb(S[key]) + ' dB';
   }
   // Windows plays the computer's sound to the headphones itself: no volume for it here
   $('pcRow').hidden = win();

@@ -162,3 +162,13 @@ select { width: 100%; background: var(--inset); color: var(--text); border: 1px 
 .warns li { margin: 4px 0; }
 .dialog .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
 .btn:disabled { opacity: .45; cursor: default; }
+
+/* a value that can be typed: click it, Enter sends, Esc leaves it (the same as io44-control's) */
+.numed { cursor: text; border-radius: 2px; }
+.numed:hover { box-shadow: inset 0 -1px 0 var(--faint); }
+.numed:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
+.numin { width: 100%; min-width: 4.5em; box-sizing: border-box; font: inherit; font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--inset); border: 1px solid var(--accent); border-radius: 2px; padding: 0 4px; text-align: right; outline: none; }
+.numed.adjusted { animation: numAdj .9s ease-out; }
+.numed.bad { animation: numBad .9s ease-out; }
+@keyframes numAdj { 0%, 40% { color: #1a1206; background: var(--comp); } 100% { background: transparent; } }
+@keyframes numBad { 0%, 40% { color: #fff; background: var(--hot); } 100% { background: transparent; } }
