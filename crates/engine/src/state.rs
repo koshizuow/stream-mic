@@ -108,7 +108,15 @@ impl Cfg {
     pub fn load() -> Option<Cfg> {
         let p = Cfg::path()?;
         let text = std::fs::read_to_string(&p).ok()?;
-        match serde_json::from_str(&text) {
+        let mut v: serde_json::Value = match serde_json::from_str(&text) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("settings {}: {e}; starting from the defaults", p.display());
+                return None;
+            }
+        };
+        migrate(&mut v);
+        match serde_json::from_value(v) {
             Ok(c) => Some(c),
             Err(e) => {
                 eprintln!("settings {}: {e}; starting from the defaults", p.display());
@@ -413,5 +421,41 @@ mod tests {
         let mut o = [0.0; 2];
         r.pop(&mut o);
         assert_eq!(o, [9.0, 9.5]);
+    }
+}
+
+/// Settings saved before the low cut became a stage of its own (2026-11-10): eq.hp and eq.hp_base move to
+/// lowcut.freq and lowcut.base, in the preset and in every edited one.
+fn migrate(v: &mut serde_json::Value) {
+    fn preset(p: &mut serde_json::Value) {
+        let Some(o) = p.as_object_mut() else { return };
+        if o.contains_key("lowcut") {
+            return;
+        }
+        let Some(eq) = o.get_mut("eq").and_then(|e| e.as_object_mut()) else { return };
+        let (Some(hp), base) = (eq.remove("hp"), eq.remove("hp_base")) else { return };
+        let base = base.unwrap_or_else(|| hp.clone());
+        o.insert("lowcut".into(), serde_json::json!({ "freq": hp, "base": base }));
+    }
+    if let Some(p) = v.get_mut("preset") {
+        preset(p);
+    }
+    if let Some(e) = v.get_mut("edited").and_then(|e| e.as_object_mut()) {
+        for p in e.values_mut() {
+            preset(p);
+        }
+    }
+}
+
+#[cfg(test)]
+mod migrate_tests {
+    #[test]
+    fn old_low_cut_moves() {
+        let mut v = serde_json::json!({ "preset": { "eq": { "hp": 120.0, "hp_base": 100.0, "low": 1.0 } },
+            "edited": { "sing": { "eq": { "hp": 90.0 } } } });
+        super::migrate(&mut v);
+        assert_eq!(v["preset"]["lowcut"], serde_json::json!({ "freq": 120.0, "base": 100.0 }));
+        assert!(v["preset"]["eq"].get("hp").is_none());
+        assert_eq!(v["edited"]["sing"]["lowcut"]["base"], 90.0);
     }
 }
