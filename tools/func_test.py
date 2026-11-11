@@ -297,6 +297,12 @@ def each_stage_switch():
                 post({"preset": {"verb": {"mix": 0.3}}})
                 time.sleep(1.5)
                 base = cycle(capture("stream-mic", 4.3))
+            if st == "deess":
+                # talk (directional)'s Speech EQ takes 2.5 dB off the top, and the hiss here then stays under the
+                # threshold (2026-11-11): a lower one, to hear it switch
+                post({"preset": {"deess": {"thr": 0.0}}})
+                time.sleep(1.5)
+                base = cycle(capture("stream-mic", 4.3))
             post({"preset": {"on": {st: not was}}})
             time.sleep(1.5 if st != "denoise" else 2.5)
             d = diff_db(base, cycle(capture("stream-mic", 4.3)))
