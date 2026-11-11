@@ -49,12 +49,22 @@ hold = 80.0
 rel = 200.0
 
 [comp]
+# the two-knob optical mode (the LA-2A model's curves): Amount and Makeup; Threshold lines the curve up (auto setup)
+style = "two-knob"
+two_knob = true
+amount = 50.0
+limit = false
+auto_makeup = false
 thr = -24.0
+makeup = 6.0
 ratio = 3.0
 knee = 6.0
-att = 10.0
-rel = 120.0
-makeup = 6.0
+att = 80.0
+rel = 39.0
+rel2 = 720.0
+slow = 31.0
+memory = 50.0
+auto_att = true
 
 [verb]
 style = "studio"

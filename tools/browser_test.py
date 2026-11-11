@@ -157,7 +157,19 @@ def page_test(name, page):
             ok = wait_for(lambda: abs(state()["preset"][st][pid] - v) < 1e-6)
             check(f"{name}: {st}.{pid}", ok, f"set {v}, engine {state()['preset'][st][pid]}")
         if st == "comp":
-            # its styles and the automatic attack
+            # the two-knob mode is the default: Limit, the automatic makeup, and (layout A) Amount and Makeup as knobs
+            check(f"{name}: comp two knobs by default", state()["preset"]["comp"]["two_knob"] is True and page.locator("#ctwo").is_visible())
+            if page.locator("#cknobs").count():
+                check(f"{name}: ... Amount and Makeup as knobs", page.locator('#cknobs .knob').count() == 2)
+            mk0 = state()["preset"]["comp"]["makeup"]
+            page.click("#autoMk")
+            check(f"{name}: ... automatic makeup on", wait_for(lambda: state()["preset"]["comp"]["auto_makeup"] is True))
+            post_amount = state()["preset"]["comp"]["amount"]
+            api("POST", "/api/state", {"preset": {"comp": {"amount": min(100, post_amount + 40)}}})
+            check(f"{name}: ... Makeup follows Amount", wait_for(lambda: state()["preset"]["comp"]["makeup"] > mk0))
+            page.click("#autoMk")
+            # the manual compressor is under Advanced
+            page.click("#cadv summary")
             page.click('#cstyles button[data-v="opto"]')
             check(f"{name}: comp style opto", wait_for(lambda: state()["preset"]["comp"]["style"] == "opto" and state()["preset"]["comp"]["rel2"] == 700))
             check(f"{name}: ... its button lit", wait_for(lambda: page.get_attribute('#cstyles button[data-v="opto"]', "aria-pressed") == "true"))

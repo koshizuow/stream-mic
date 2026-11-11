@@ -33,8 +33,8 @@ const I18N = {
     verb_note: '八種人聲用的風格，各自有不同的長度、音色、初期反射和預延遲；空間感旋鈕只調量。改了下面的數值就是自訂。', custom: '自訂',
     verb_note_pub: '照這一家公開的預設數值換算成這裡的參數；reverb 的算法不同，聽起來接近但不會一樣。空間感旋鈕只調量，改了下面的數值就是自訂。',
     fam_ours: '標準', fam_y: 'Y 家', fam_d: 'D 家', fam_f: 'F 家',
-    comp_clean: '乾淨', comp_opto: '光學式', comp_two: '光學兩鈕', comp_custom: '目前是模式的預設或自訂的值。', limit_mode: 'Limit（比 Compress 硬）',
-    comp_two_note: '光學兩鈕：只用「Amount」和「Makeup」。Amount 越大越早開始壓、壓得越多，放開也越快；壓縮曲線和時間都照實測的模型。Threshold 在這裡只是把曲線對齊你的音量（自動設定會調）。', auto_att: '自動起音（壓得越多越快）',
+    comp_clean: '乾淨', comp_opto: '光學式', comp_two: '光學兩鈕', comp_adv: '進階：手動壓縮器（乾淨、光學式，所有數值都能調）', auto_makeup: '自動補償（轉 Amount 時 Makeup 跟著補，音量不變）', comp_custom: '目前是模式的預設或自訂的值。', limit_mode: 'Limit（比 Compress 硬）',
+    comp_two_note: 'Amount 越大越早開始壓、壓得越多，放開也越快；壓縮曲線和時間都照實測的模型。像原機一樣，轉大 Amount 音量會變小，用 Makeup 補回來（或打開自動補償）。Threshold 在這裡只是把曲線對齊你的音量，自動設定會調。', auto_att: '自動起音（壓得越多越快）',
     comp_note: '光學式：壓得越多起音越快；放開時先很快回一大半，剩下的慢慢回來，壓得越久尾巴越慢。門檻和補償不變；改了下面的數值就是自訂。',
     eq_natural: '自然', eq_demud: '去悶', eq_phone: '電話', eq_custom: '目前是模式的預設或自訂的值。',
     eq_style_note: '選一個風格當起點，厚薄旋鈕會在上面再加厚或減薄；改了下面的數值就是自訂。',
@@ -98,8 +98,8 @@ const I18N = {
     verb_note: 'Eight styles for a voice, each its own length, tone, early reflections and pre-delay; the Space knob sets only how much. Changing a value below makes it custom.', custom: 'Custom',
     verb_note_pub: 'This maker’s published preset values, turned into the settings here; the reverb itself is a different one, so it sounds close, not the same. The Space knob sets only how much; changing a value below makes it custom.',
     fam_ours: 'Standard', fam_y: 'Y', fam_d: 'D', fam_f: 'F',
-    comp_clean: 'Clean', comp_opto: 'Optical', comp_two: 'Optical, two knobs', limit_mode: 'Limit (harder than Compress)',
-    comp_two_note: 'Optical, two knobs: only Amount and Makeup. More Amount compresses earlier and more, and lets go faster; the curve and the times are the measured model’s. Threshold here only lines the curve up with your level (auto setup sets it).',
+    comp_clean: 'Clean', comp_opto: 'Optical', comp_two: 'Optical, two knobs', comp_adv: 'Advanced: manual compressor (Clean, Optical, every value)', auto_makeup: 'Automatic makeup (Makeup follows Amount, the level stays)', limit_mode: 'Limit (harder than Compress)',
+    comp_two_note: 'More Amount compresses earlier and more, and lets go faster; the curve and the times are the measured model’s. As on the original, more Amount makes it quieter: bring it back with Makeup (or turn on the automatic makeup). Threshold here only lines the curve up with your level; auto setup sets it.',
     comp_custom: 'The mode’s own values, or custom. ', auto_att: 'Automatic attack (faster the more it reduces)',
     comp_note: 'Optical: the attack gets faster the more it reduces; letting go, most comes back quickly and the rest slowly, the slower the longer it was reducing. Threshold and makeup stay; changing a value below makes it custom.',
     eq_natural: 'Natural', eq_demud: 'De-mud', eq_phone: 'Phone', eq_custom: 'The mode’s own values, or custom. ',
@@ -176,7 +176,10 @@ const VERB_STYLES = VERB_FAMILIES.flatMap(([, l]) => l);
 const EQ_FAMILIES = [['ours', [['natural', t0('eq_natural')], ['demud', t0('eq_demud')], ['phone', t0('eq_phone')]]], ['f', [['f-clean', 'Clean'], ['f-warm', 'Warm'], ['f-bright', 'Bright'], ['f-radio', 'Radio']]]];
 let eqFam = null;
 // the compressor's styles (crates/chain/src/preset.rs COMP_STYLES)
-const COMP_STYLES = [['clean', t0('comp_clean')], ['opto', t0('comp_opto')], ['two-knob', t0('comp_two')]];
+const COMP_STYLES = [['two-knob', t0('comp_two')], ['clean', t0('comp_clean')], ['opto', t0('comp_opto')]];
+// the two-knob mode's knobs (layout A draws them as knobs; B as sliders)
+const CKNOBS = [{ id: 'amount', min: 0, max: () => 100, step: 1, name: () => 'Amount', word: (v) => String(Math.round(v)) },
+  { id: 'makeup', min: 0, max: () => 18, step: 0.5, name: () => 'Makeup', word: (v) => '+' + (+v).toFixed(1) + ' dB' }];
 function t0(k) { return () => t(k); }
 const nm = (n) => (typeof n === 'function' ? n() : n);
 const famOf = (style) => (VERB_FAMILIES.find(([, l]) => l.some(([v]) => v === style)) || [null])[0];
@@ -856,10 +859,12 @@ function buildDetail() {
     (s.id === 'eq' ? '<div class="seg" id="efams" style="margin-bottom:6px">' + EQ_FAMILIES.map(([f]) => '<button data-f="' + f + '">' + t('fam_' + f) + '</button>').join('') + '</div>' +
       '<div class="seg" id="estyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)"></div><p class="note"><span id="ecustom"></span><span id="enote"></span></p>' +
       '<canvas id="eqc"></canvas><p class="note">' + t('eq_note') + '</p>' : '') +
-    (s.id === 'comp' ? '<div class="seg" id="cstyles" style="margin-bottom:6px">' + COMP_STYLES.map(([v, n]) => '<button data-v="' + v + '">' + nm(n) + '</button>').join('') + '</div>' +
-      '<p class="note"><span id="ccustom"></span><span id="ccomp_note"></span></p>' +
-      '<div class="row" id="autoRow" style="grid-template-columns:1fr auto;margin-bottom:6px"><span>' + t('auto_att') + '</span><button class="sw" id="autoAtt" role="switch" aria-label="' + t('auto_att') + '"></button></div>' +
-      '<div class="row" id="limRow" style="grid-template-columns:1fr auto;margin-bottom:6px"><span>' + t('limit_mode') + '</span><button class="sw" id="limMode" role="switch" aria-label="' + t('limit_mode') + '"></button></div>' : '') +
+    (s.id === 'comp' ? '<div id="ctwo"><p class="note" style="margin-top:0">' + t('comp_two_note') + '</p>' +
+      (LAYOUT === 'a' ? '<div class="knobs" id="cknobs" style="margin:6px 0 10px">' + CKNOBS.map((k) => '<div class="knob" data-k="' + k.id + '" tabindex="0" role="slider"><div class="sv"></div><div class="kname"></div><div class="kval val"></div></div>').join('') + '</div>' : '') +
+      sw('limRow', 'limMode', t('limit_mode')) + sw('mkRow', 'autoMk', t('auto_makeup')) + '</div>' +
+      '<details id="cadv" style="margin:6px 0"><summary class="note" style="cursor:pointer">' + t('comp_adv') + '</summary>' +
+      '<div class="seg" id="cstyles" style="margin:6px 0">' + COMP_STYLES.map(([v, n]) => '<button data-v="' + v + '">' + nm(n) + '</button>').join('') + '</div>' +
+      '<p class="note"><span id="ccustom"></span><span id="ccomp_note"></span></p>' + sw('autoRow', 'autoAtt', t('auto_att')) + '</details>' : '') +
     (s.id === 'verb' ? '<div class="seg" id="vfams" style="margin-bottom:6px">' + VERB_FAMILIES.map(([f]) => '<button data-f="' + f + '">' + t('fam_' + f) + '</button>').join('') + '</div>' +
       '<div class="seg" id="vstyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)"></div><p class="note"><span id="vcustom"></span><span id="vnote"></span></p>' : '') +
     s.params.map(([id, name, lo, hi, st, u, only]) => '<label class="lvl" data-p="' + id + '"' + (only ? ' data-only="' + only + '"' : '') + '><span>' + name + '</span><input type="range" min="' + lo + '" max="' + hi + '" step="' + st + '"><output></output></label>').join('');
@@ -882,12 +887,50 @@ function buildDetail() {
     $('cstyles').onclick = (e) => { const b = e.target.closest('button'); if (b) post({ preset: { comp: { style: b.dataset.v } } }); };
     $('autoAtt').onclick = () => post({ preset: { comp: { auto_att: !P().comp.auto_att } } });
     $('limMode').onclick = () => post({ preset: { comp: { limit: !P().comp.limit } } });
+    $('autoMk').onclick = () => post({ preset: { comp: { auto_makeup: !P().comp.auto_makeup } } });
+    $('cadv').open = !P().comp.two_knob;
+    if ($('cknobs')) compKnobs();
   }
   if (s.id === 'verb') {
     $('vfams').onclick = (e) => { const b = e.target.closest('button'); if (b) { verbFam = b.dataset.f; detailUI(); } };
     $('vstyles').onclick = (e) => { const b = e.target.closest('button'); if (b) post({ preset: { verb: { style: b.dataset.v } } }); };
   }
   detailUI();
+}
+// a labelled switch row
+function sw(row, id, label) {
+  return '<div class="row" id="' + row + '" style="grid-template-columns:1fr auto;margin-bottom:6px"><span>' + label + '</span><button class="sw" id="' + id + '" role="switch" aria-label="' + label + '"></button></div>';
+}
+// layout A: the two-knob mode's Amount and Makeup as knobs, turned like the five above
+function compKnobs() {
+  for (const el of $('cknobs').children) {
+    const k = CKNOBS.find((x) => x.id === el.dataset.k), send = throttled((v) => post({ preset: { comp: { [k.id]: v } } }));
+    let y0 = null, v0 = 0;
+    const set = (v, end) => {
+      const x = clamp(Math.round(v / k.step) * k.step, k.min, k.max());
+      P().comp[k.id] = x;
+      end ? send.end(x) : send.move(x);
+      compKnobsUI();
+    };
+    el.addEventListener('pointerdown', (e) => { y0 = e.clientY; v0 = P().comp[k.id]; el.setPointerCapture(e.pointerId); holding.add('ck:' + k.id); });
+    el.addEventListener('pointermove', (e) => { if (y0 !== null) set(v0 + ((y0 - e.clientY) * (k.max() - k.min)) / (e.shiftKey ? 600 : 160)); });
+    el.addEventListener('pointerup', (e) => { if (y0 !== null) set(v0 + ((y0 - e.clientY) * (k.max() - k.min)) / (e.shiftKey ? 600 : 160), true); y0 = null; holding.delete('ck:' + k.id); });
+    el.addEventListener('wheel', (e) => { e.preventDefault(); set(P().comp[k.id] - Math.sign(e.deltaY) * (k.max() - k.min) / 50, true); }, { passive: false });
+    el.addEventListener('keydown', (e) => { if (e.target !== el) return; const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key]; if (d) { e.preventDefault(); set(P().comp[k.id] + d * (k.max() - k.min) / 50, true); } });
+    const kv = el.querySelector('.kval');
+    kv.addEventListener('pointerdown', (e) => e.stopPropagation());
+    numEdit(kv, { lo: k.min, get hi() { return k.max(); }, step: k.step, get: () => P().comp[k.id], apply: (x) => { P().comp[k.id] = x; post({ preset: { comp: { [k.id]: x } } }); compKnobsUI(); } });
+  }
+}
+function compKnobsUI() {
+  for (const el of $('cknobs').children) {
+    const k = CKNOBS.find((x) => x.id === el.dataset.k), v = P().comp[k.id];
+    el.querySelector('.sv').innerHTML = knobSvg(v, k);
+    el.querySelector('.kname').textContent = k.name();
+    if (!isEditing(el.querySelector('.kval'))) el.querySelector('.kval').textContent = k.word(v);
+    el.setAttribute('aria-label', k.name());
+    el.setAttribute('aria-valuenow', v);
+  }
 }
 function detailUI() {
   if (!picked) return;
@@ -898,7 +941,8 @@ function detailUI() {
   for (const row of d.querySelectorAll('.lvl[data-p]')) {
     const id = row.dataset.p, inp = row.querySelector('input'), q = s.params.find((x) => x[0] === id), v = P()[s.id][id];
     const only = row.dataset.only, two = !!P().comp.two_knob;
-    row.hidden = (only === 'sing' && !sing()) || (only === 'two' && !two) || (only === 'one' && two);
+    row.hidden = (only === 'sing' && !sing()) || (only === 'two' && !two) || (only === 'one' && two) ||
+      (s.id === 'comp' && two && LAYOUT === 'a' && (id === 'amount' || id === 'makeup'));
     if (s.id === 'verb' && id === 'mix') row.querySelector('span').textContent = sing() ? 'Mix (with backing)' : 'Mix';
     if (!holding.has('p:' + id)) inp.value = v;
     if (!isEditing(row.querySelector('output'))) row.querySelector('output').textContent = pText(s.id, id, v, q);
@@ -918,9 +962,16 @@ function detailUI() {
     $('ccustom').textContent = P().comp.style ? '' : t('comp_custom');
     $('autoAtt').setAttribute('aria-checked', !!P().comp.auto_att);
     $('limMode').setAttribute('aria-checked', !!P().comp.limit);
-    $('limRow').hidden = !P().comp.two_knob;
+    $('autoMk').setAttribute('aria-checked', !!P().comp.auto_makeup);
+    $('ctwo').hidden = !P().comp.two_knob;
     $('autoRow').hidden = !!P().comp.two_knob;
-    $('ccomp_note').textContent = t(P().comp.two_knob ? 'comp_two_note' : 'comp_note');
+    $('ccomp_note').textContent = P().comp.two_knob ? '' : t('comp_note');
+    if ($('cknobs')) compKnobsUI();
+    // two knobs: Advanced last, under Threshold; the manual compressor: its styles first, then its values
+    const adv = $('cadv'), first = d.querySelector('.lvl[data-p]');
+    if (P().comp.two_knob ? adv.nextElementSibling : adv.nextElementSibling !== first) {
+      if (P().comp.two_knob) d.appendChild(adv); else d.insertBefore(adv, first);
+    }
   }
   if (s.id === 'verb') {
     const fam = verbFam || famOf(P().verb.style) || 'ours';

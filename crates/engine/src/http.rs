@@ -252,8 +252,14 @@ pub fn apply(shared: &Shared, v: &Value) -> Result<(), String> {
                         c.preset.comp.style = bc.style.clone();
                     }
                 } else if cc.two_knob && (cc.amount, cc.limit) != (bc.amount, bc.limit) {
-                    // the two-knob mode: Amount or Compress/Limit brings the model's times along
+                    // the two-knob mode: Amount or Compress/Limit brings the model's times along, and Makeup when it
+                    // follows (unless Makeup itself came with it)
+                    let same_makeup = cc.makeup == bc.makeup;
                     c.preset.comp.two_knob_times();
+                    if same_makeup {
+                        let b = before.preset.comp.clone();
+                        c.preset.comp.follow_makeup(&b);
+                    }
                 } else if (cc.ratio, cc.knee, cc.att, cc.rel, cc.rel2, cc.slow, cc.memory, cc.auto_att) != (bc.ratio, bc.knee, bc.att, bc.rel, bc.rel2, bc.slow, bc.memory, bc.auto_att) {
                     c.preset.comp.style = String::new();
                 }

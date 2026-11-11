@@ -193,6 +193,9 @@ pub struct CompP {
     pub amount: f64,
     /// Limit instead of Compress
     pub limit: bool,
+    /// the two-knob mode: turning Amount (or Compress/Limit) moves Makeup by the change in reduction at the voice's
+    /// level, so the loudness stays; off, it is as the original: the level drops and Makeup brings it back
+    pub auto_makeup: bool,
 }
 
 /// where the measured curves sit when Threshold is at the default -24: the model's own levels
@@ -216,6 +219,20 @@ impl CompP {
         GrCurve { lo: ot::LO + (self.thr - TWO_KNOB_REF), step: 2.0, gr }
     }
 
+    /// the reduction at the voice's level: auto setup lines the curve up so that the voice's middle is reduced about
+    /// 4 dB at Amount 50, which the model's curve gives 6 dB above Threshold (the model's -18 dBFS)
+    pub fn voice_gr(&self) -> f64 {
+        self.two_knob_curve().at(self.thr + 6.0)
+    }
+
+    /// Amount or Compress/Limit changed from `before`: with the automatic makeup on, Makeup follows the reduction
+    pub fn follow_makeup(&mut self, before: &CompP) {
+        if self.two_knob && self.auto_makeup {
+            let b = CompP { thr: self.thr, ..before.clone() };
+            self.makeup = (((self.makeup + self.voice_gr() - b.voice_gr()) * 2.0).round() / 2.0).clamp(-12.0, 36.0);
+        }
+    }
+
     /// the times that go with Amount and the mode (the model's), into the values the page shows
     pub fn two_knob_times(&mut self) {
         let rel = if self.limit { &ot::LIMIT_REL } else { &ot::COMPRESS_REL };
@@ -232,7 +249,7 @@ impl CompP {
 
 impl Default for CompP {
     fn default() -> Self {
-        CompP { style: String::new(), thr: -24.0, ratio: 3.0, knee: 6.0, att: 10.0, rel: 120.0, makeup: 6.0, rel2: 0.0, slow: 0.0, memory: 0.0, auto_att: false, two_knob: false, amount: 50.0, limit: false }
+        CompP { style: String::new(), thr: -24.0, ratio: 3.0, knee: 6.0, att: 10.0, rel: 120.0, makeup: 6.0, rel2: 0.0, slow: 0.0, memory: 0.0, auto_att: false, two_knob: false, amount: 50.0, limit: false, auto_makeup: false }
     }
 }
 
@@ -667,9 +684,8 @@ mod tests {
         assert!(p.set_comp_style("opto"));
         assert_eq!((p.comp.style.as_str(), p.comp.rel2, p.comp.thr, p.comp.makeup), ("opto", 700.0, thr, mk));
         assert!(p.set_comp_style("clean"));
-        // the talk presets' own values are the clean style's
-        let t = Preset::built_in("talk-omni").unwrap().comp;
-        assert_eq!((p.comp.ratio, p.comp.knee, p.comp.att, p.comp.rel, p.comp.rel2, p.comp.auto_att), (t.ratio, t.knee, t.att, t.rel, 0.0, false));
+        // the plain compressor the talk presets had before the two-knob mode
+        assert_eq!((p.comp.ratio, p.comp.knee, p.comp.att, p.comp.rel, p.comp.rel2, p.comp.auto_att, p.comp.two_knob), (3.0, 6.0, 10.0, 120.0, 0.0, false, false));
         assert!(!p.set_comp_style("nope"));
         assert!(Preset::parse(&p.to_toml()).unwrap() == p);
     }
@@ -700,6 +716,30 @@ mod tests {
         // another style leaves the mode
         assert!(p.set_comp_style("opto"));
         assert!(!p.comp.two_knob && p.comp_params().curve.is_none());
+    }
+
+    #[test]
+    fn built_in_presets_use_the_two_knob_mode_with_its_times() {
+        for (name, _) in BUILT_IN {
+            let p = Preset::built_in(name).unwrap();
+            assert!(p.comp.two_knob && p.comp.style == "two-knob", "{name}");
+            let mut q = p.comp.clone();
+            q.two_knob_times();
+            assert_eq!(q, p.comp, "{name}: the times are the model's for its Amount");
+        }
+    }
+
+    #[test]
+    fn automatic_makeup_keeps_the_voice_level() {
+        let mut p = Preset::built_in("talk-omni").unwrap();
+        let before = p.comp.clone();
+        p.comp.amount = 90.0;
+        p.comp.follow_makeup(&before);
+        assert_eq!(p.comp.makeup, before.makeup, "off: Makeup stays");
+        p.comp.auto_makeup = true;
+        p.comp.follow_makeup(&before);
+        let d = p.comp.voice_gr() - CompP { thr: p.comp.thr, ..before.clone() }.voice_gr();
+        assert!(d > 3.0 && (p.comp.makeup - before.makeup - d).abs() <= 0.25, "{d} {}", p.comp.makeup);
     }
 
     #[test]
