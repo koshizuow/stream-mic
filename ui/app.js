@@ -36,7 +36,7 @@ const I18N = {
     comp_clean: '乾淨', comp_opto: '光學式', comp_two: '光學兩鈕', comp_adv: '進階：手動壓縮器（乾淨、光學式，所有數值都能調）', auto_makeup: '自動補償（轉 Amount 時 Makeup 跟著補，音量不變）', comp_custom: '目前是模式的預設或自訂的值。', limit_mode: 'Limit（比 Compress 硬）',
     comp_two_note: 'Amount 越大越早開始壓、壓得越多，放開也越快；壓縮曲線和時間都照實測的模型。像原機一樣，轉大 Amount 音量會變小，用 Makeup 補回來（或打開自動補償）。Threshold 在這裡只是把曲線對齊你的音量，自動設定會調。', auto_att: '自動起音（壓得越多越快）',
     comp_note: '光學式：壓得越多起音越快；放開時先很快回一大半，剩下的慢慢回來，壓得越久尾巴越慢。門檻和補償不變；改了下面的數值就是自訂。',
-    eq_natural: '自然', eq_demud: '去悶', eq_phone: '電話', eq_custom: '目前是模式的預設或自訂的值。',
+    eq_natural: '自然', eq_speech: '講話', eq_demud: '去悶', eq_phone: '電話', eq_custom: '目前是模式的預設或自訂的值。',
     eq_style_note: '選一個風格當起點，厚薄旋鈕會在上面再加厚或減薄；改了下面的數值就是自訂。',
     eq_style_pub: '這一家公開的預設數值：中頻、清晰照原本的頻率和 Q；最低、最高那段換成我們的低頻、空氣感架形，所以接近但不完全一樣。厚薄旋鈕在上面再調。',
     details: '細節', pick_stage: '在上面的處理鏈點一段。', drag_too: '；門檻也可以在上面的圖拖',
@@ -102,7 +102,7 @@ const I18N = {
     comp_two_note: 'More Amount compresses earlier and more, and lets go faster; the curve and the times are the measured model’s. As on the original, more Amount makes it quieter: bring it back with Makeup (or turn on the automatic makeup). Threshold here only lines the curve up with your level; auto setup sets it.',
     comp_custom: 'The mode’s own values, or custom. ', auto_att: 'Automatic attack (faster the more it reduces)',
     comp_note: 'Optical: the attack gets faster the more it reduces; letting go, most comes back quickly and the rest slowly, the slower the longer it was reducing. Threshold and makeup stay; changing a value below makes it custom.',
-    eq_natural: 'Natural', eq_demud: 'De-mud', eq_phone: 'Phone', eq_custom: 'The mode’s own values, or custom. ',
+    eq_natural: 'Natural', eq_speech: 'Speech', eq_demud: 'De-mud', eq_phone: 'Phone', eq_custom: 'The mode’s own values, or custom. ',
     eq_style_note: 'A style to start from; the Body knob adds or takes away on top; changing a value below makes it custom.',
     eq_style_pub: 'This maker’s published preset values: the mid and presence bells at their own frequency and Q; their lowest and highest go to our Low and Air shelves, so near, not the same. The Body knob adjusts on top.',
     details: 'Details', pick_stage: 'Click a stage in the chain above.', drag_too: '; the threshold can be dragged in the scope too',
@@ -173,7 +173,7 @@ const VERB_FAMILIES = [
 ];
 const VERB_STYLES = VERB_FAMILIES.flatMap(([, l]) => l);
 // the EQ's styles (crates/chain/src/preset.rs EQ_STYLES): ours, and "f" (Focusrite Vocaster's published Enhance presets)
-const EQ_FAMILIES = [['ours', [['natural', t0('eq_natural')], ['demud', t0('eq_demud')], ['phone', t0('eq_phone')]]], ['f', [['f-clean', 'Clean'], ['f-warm', 'Warm'], ['f-bright', 'Bright'], ['f-radio', 'Radio']]]];
+const EQ_FAMILIES = [['ours', [['natural', t0('eq_natural')], ['speech', t0('eq_speech')], ['demud', t0('eq_demud')], ['phone', t0('eq_phone')]]], ['f', [['f-clean', 'Clean'], ['f-warm', 'Warm'], ['f-bright', 'Bright'], ['f-radio', 'Radio']]]];
 let eqFam = null;
 // the compressor's styles (crates/chain/src/preset.rs COMP_STYLES)
 const COMP_STYLES = [['two-knob', t0('comp_two')], ['clean', t0('comp_clean')], ['opto', t0('comp_opto')]];

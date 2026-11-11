@@ -4,7 +4,7 @@
 # Thresholds (exp, comp) are placeholders until auto setup (build-plan step 8) measures the room.
 name = "talk-directional"
 label = "說話（指向）"
-about = "對著嘴的指向性麥克風（大多數 USB、XLR 麥）：清晰和空氣感各加一點"
+about = "對著嘴的指向性麥克風（大多數 USB、XLR 麥）：EQ 用「講話」（錄音師處理講話的平均：去悶、清晰、收一點高頻）"
 follow_music = false
 
 [knobs]
@@ -28,13 +28,22 @@ lim = true
 limit = 6.0
 
 [lowcut]
-freq = 80.0
-base = 80.0
+freq = 90.0
+base = 90.0
 
 [eq]
 low = 0.0
 pres = 1.5
-air = 1.0
+air = -2.5
+style = "speech"
+mid = -2.0
+mid_f = 315.0
+mid_q = 1.4
+pres_f = 2500.0
+pres_q = 0.7
+hc = 20000.0
+low_base = 0.0
+pres_base = 1.5
 
 [deess]
 thr = 7.0

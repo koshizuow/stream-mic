@@ -348,9 +348,13 @@ pub struct EqStyle {
 /// Presets' Parameters": a high pass at 80 Hz and three bells, frequency, Q and gain). Their bells go into our
 /// bands: a bell at 100-135 Hz becomes the Low shelf, 450 Hz-1 kHz the Mid, 2-6 kHz the Presence, 7-11 kHz the Air
 /// shelf (so those two are near, not the same); the rest are exact. Their compressor is not part of the EQ.
-pub const EQ_STYLES: [EqStyle; 7] = [
+pub const EQ_STYLES: [EqStyle; 8] = [
     EqStyle { name: "natural", hp: 80.0, low: 0.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 0.0, pres_f: 3000.0, pres_q: 1.0, air: 0.0, hc: 20000.0 },
     EqStyle { name: "demud", hp: 100.0, low: 0.0, mid: -3.0, mid_f: 300.0, mid_q: 1.4, pres: 1.5, pres_f: 3000.0, pres_q: 1.0, air: 1.0, hc: 20000.0 },
+    // what DAPS's engineer did to its studio speech (produced against clean, 20 speakers, 100 takes, the median;
+    // stream-mic design notes eq-styles.md, 2026-11-11): the lows under 80-100 Hz down, about -2 dB around 315 Hz,
+    // +1.5 dB broad at 2-3 kHz, and the top from 6 kHz down 2.5-3 dB
+    EqStyle { name: "speech", hp: 90.0, low: 0.0, mid: -2.0, mid_f: 315.0, mid_q: 1.4, pres: 1.5, pres_f: 2500.0, pres_q: 0.7, air: -2.5, hc: 20000.0 },
     EqStyle { name: "phone", hp: 300.0, low: 0.0, mid: 3.0, mid_f: 1000.0, mid_q: 1.0, pres: 2.0, pres_f: 2500.0, pres_q: 1.0, air: 0.0, hc: 3400.0 },
     EqStyle { name: "f-clean", hp: 80.0, low: -2.0, mid: 0.0, mid_f: 400.0, mid_q: 1.4, pres: 2.0, pres_f: 2000.0, pres_q: 0.6, air: 2.0, hc: 20000.0 },
     EqStyle { name: "f-warm", hp: 80.0, low: -1.0, mid: 2.5, mid_f: 450.0, mid_q: 0.7, pres: -1.0, pres_f: 2500.0, pres_q: 0.5, air: 0.0, hc: 20000.0 },

@@ -51,7 +51,7 @@ rel = 600.0
 # the two-knob optical mode (the LA-2A model's curves): Amount and Makeup; Threshold lines the curve up (auto setup)
 style = "two-knob"
 two_knob = true
-amount = 50.0
+amount = 40.0
 limit = false
 auto_makeup = false
 thr = -22.0
@@ -59,9 +59,9 @@ makeup = 5.0
 ratio = 2.5
 knee = 6.0
 att = 80.0
-rel = 39.0
-rel2 = 720.0
-slow = 31.0
+rel = 43.0
+rel2 = 770.0
+slow = 33.0
 memory = 50.0
 auto_att = true
 

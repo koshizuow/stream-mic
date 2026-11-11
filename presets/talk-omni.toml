@@ -33,8 +33,17 @@ base = 80.0
 
 [eq]
 low = 1.0
-pres = 1.0
+pres = -0.5
 air = 0.0
+style = "natural"
+mid = 0.0
+mid_f = 400.0
+mid_q = 1.4
+pres_f = 3000.0
+pres_q = 1.0
+hc = 20000.0
+low_base = 0.0
+pres_base = 0.0
 
 [deess]
 thr = 7.0
