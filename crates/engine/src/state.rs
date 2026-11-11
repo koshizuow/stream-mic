@@ -178,6 +178,8 @@ pub struct Counters {
     pub quantum: AtomicU64,
     /// the denoise worker had not caught up when the audio thread needed its samples
     pub dn_under: AtomicU64,
+    /// times the denoise slack grew after a shortfall (proc.rs)
+    pub dn_grew: AtomicU64,
     /// the denoise worker's longest call, and calls over 5 ms
     pub dn_worst_us: AtomicU64,
     pub dn_slow: AtomicU64,

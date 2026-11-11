@@ -332,6 +332,7 @@ pub fn stats(shared: &Shared) -> Value {
         "monitor_limiter_ms": ms(&c.mon_lim),
         "denoise_ms": ms(&c.dn_lat),
         "dn_under": c.dn_under.load(Ordering::Relaxed),
+        "dn_grew": c.dn_grew.load(Ordering::Relaxed),
         "dn_worst_us": c.dn_worst_us.load(Ordering::Relaxed),
         "dn_slow": c.dn_slow.load(Ordering::Relaxed),
         "pc_under": c.pc_under.load(Ordering::Relaxed),

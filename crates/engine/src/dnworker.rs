@@ -18,9 +18,23 @@ use stream_mic_dsp::Stage;
 
 use crate::state::Shared;
 
-/// samples of slack for a slow hop. 10 ms was not enough on a Linux test PC (powersave: hops up to 9.5 ms, 30 short in 16 s)
-pub fn margin() -> usize {
-    std::env::var("STREAM_MIC_DN_MARGIN").ok().and_then(|v| v.parse().ok()).unwrap_or(960)
+/// Samples of slack for slow hops, chosen when the worker starts from how fast this computer runs the model (calibrate),
+/// unless STREAM_MIC_DN_MARGIN says. 10 ms was not enough on a Linux test PC (powersave: hops up to 9.5 ms, 30 short in
+/// 16 s); 20 ms on an i3-10105F (powersave) still came up short 45 times in 10 minutes, 40 ms never (2026-11-12): the
+/// model's hops there take up to 14 ms now and then, and a few slow ones in a row eat the slack.
+pub fn margin_env() -> Option<usize> {
+    std::env::var("STREAM_MIC_DN_MARGIN").ok().and_then(|v| v.parse().ok())
+}
+/// The most the slack may grow to while running (proc.rs grows it after a shortfall): 80 ms
+pub const MARGIN_MAX: usize = 3840;
+
+/// The slack for a computer whose hops take `p99_us` (99th percentile, microseconds) on a 10 ms hop
+pub fn margin_for(p99_us: u64) -> usize {
+    match p99_us {
+        0..=4000 => 960,     // 20 ms: fast enough that a hop rarely takes half its time
+        4001..=7000 => 1440, // 30 ms
+        _ => 1920,           // 40 ms
+    }
 }
 
 /// One writer, one reader, no locks
@@ -79,20 +93,23 @@ pub struct DnLink {
     pub to: Arc<Spsc>,
     pub from: Arc<Spsc>,
     pub thread: Thread,
-    /// samples between handing the mic over and getting it back denoised: the model's latency plus MARGIN
+    /// samples between handing the mic over and getting it back denoised: the model's latency plus the slack
     pub latency: usize,
+    /// the model's own latency (latency minus the slack)
+    pub model: usize,
+    /// what the calibration measured: the hops' 99th percentile and longest, microseconds
+    pub p99_us: u64,
+    pub max_us: u64,
 }
 
 /// Start the worker. The model loads in it (it cannot move between threads), and says its latency when ready.
 pub fn start(shared: Arc<Shared>, params: DenoiseParams, rate: f64) -> Result<DnLink, String> {
     let to = Arc::new(Spsc::new(rate as usize));
     let from = Arc::new(Spsc::new(rate as usize));
-    // the slack, as silence, before anything comes back
-    from.push(&vec![0.0; margin()]);
     let (t2, f2) = (to.clone(), from.clone());
     let stop = Arc::new(AtomicBool::new(false));
     let stop2 = stop.clone();
-    let (ready, wait) = std::sync::mpsc::channel::<Result<usize, String>>();
+    let (ready, wait) = std::sync::mpsc::channel::<Result<(usize, u64, u64), String>>();
     let handle = std::thread::Builder::new()
         .name("denoise".into())
         .spawn(move || {
@@ -110,8 +127,24 @@ pub fn start(shared: Arc<Shared>, params: DenoiseParams, rate: f64) -> Result<Dn
             for _ in 0..100 {
                 d.process(&mut warm);
             }
+            // then how fast this computer is: 2 s of quiet noise (the model's work does not depend on what it hears)
+            let mut seed = 0x2545F491u32;
+            let mut us: Vec<u64> = (0..200)
+                .map(|_| {
+                    for v in warm.iter_mut() {
+                        seed ^= seed << 13;
+                        seed ^= seed >> 17;
+                        seed ^= seed << 5;
+                        *v = (seed as f32 / u32::MAX as f32 - 0.5) * 0.02;
+                    }
+                    let t0 = std::time::Instant::now();
+                    d.process(&mut warm);
+                    t0.elapsed().as_micros() as u64
+                })
+                .collect();
+            us.sort_unstable();
             d.reset();
-            let _ = ready.send(Ok(d.latency()));
+            let _ = ready.send(Ok((d.latency(), us[us.len() * 99 / 100], us[us.len() - 1])));
             let mut buf = vec![0.0f32; 4096];
             let mut gen = 0;
             let mut on = false;
@@ -146,8 +179,11 @@ pub fn start(shared: Arc<Shared>, params: DenoiseParams, rate: f64) -> Result<Dn
             }
         })
         .map_err(|e| e.to_string())?;
-    let model = wait.recv().map_err(|e| e.to_string())??;
-    Ok(DnLink { stop, to, from, thread: handle.thread().clone(), latency: model + margin() })
+    let (model, p99_us, max_us) = wait.recv().map_err(|e| e.to_string())??;
+    let margin = margin_env().unwrap_or_else(|| margin_for(p99_us)).min(MARGIN_MAX);
+    // the slack, as silence, before anything comes back
+    from.push(&vec![0.0; margin]);
+    Ok(DnLink { stop, to, from, thread: handle.thread().clone(), latency: model + margin, model, p99_us, max_us })
 }
 
 impl Drop for DnLink {

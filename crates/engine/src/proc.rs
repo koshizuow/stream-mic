@@ -102,8 +102,13 @@ pub struct Rt {
     pub dn: DnLink,
     pub dnb: Vec<f32>,
     /// samples owed: the worker fell short and silence went out instead; skipped when they arrive, so the delay
-    /// stays what the chain was told
+    /// stays what the chain was told. Only once the slack cannot grow any more (dn_lat at its most)
     pub dn_debt: usize,
+    /// the denoise delay now: the model's and the slack, which grows by the shortfall and 10 ms more each time the
+    /// worker falls short, up to dnworker::MARGIN_MAX (one gap, then none: better a little later than gaps)
+    pub dn_lat: usize,
+    /// silence still to give out while the slack fills up after it grew
+    pub dn_pad: usize,
     // scratch, allocated once
     #[cfg_attr(windows, allow(dead_code))]
     pub mic: Vec<f32>,
@@ -216,11 +221,24 @@ impl Rt {
                 self.dn_debt -= self.dn.from.skip(self.dn_debt.min(w - n));
             }
         }
-        let got = self.dn.from.pop(&mut self.dnb[..n]);
+        let z = self.dn_pad.min(n);
+        self.dnb[..z].fill(0.0);
+        self.dn_pad -= z;
+        let got = z + self.dn.from.pop(&mut self.dnb[z..n]);
         if got < n {
             self.dnb[got..n].fill(0.0);
-            self.dn_debt += n - got;
             self.shared.count.dn_under.fetch_add(1, Ordering::Relaxed);
+            let short = n - got;
+            if self.dn_lat + short + 480 <= self.dn.model + crate::dnworker::MARGIN_MAX {
+                // grow the slack: what was missing is now delay, and 10 ms more of it comes out as silence
+                self.dn_lat += short + 480;
+                self.dn_pad += 480;
+                self.chain.set_external_denoise(Some(self.dn_lat));
+                self.shared.count.dn_lat.store(self.dn_lat as u64, Ordering::Relaxed);
+                self.shared.count.dn_grew.fetch_add(1, Ordering::Relaxed);
+            } else {
+                self.dn_debt += short;
+            }
         }
         self.s.resize(n, 0.0);
         self.m.resize(n, 0.0);
@@ -353,10 +371,14 @@ impl Rt {
         let cfg = shared.cfg.lock().unwrap().clone();
         let mut chain = Chain::new(cfg.preset.clone())?;
         let dn = dnworker::start(shared.clone(), cfg.preset.denoise_params(), RATE as f64)?;
+        // the bypass's dry delay is sized in prepare for the longest the denoise delay may grow to
+        chain.set_external_denoise(Some(dn.model + crate::dnworker::MARGIN_MAX));
+        chain.prepare(RATE as f64, MAX_BLOCK);
         chain.set_external_denoise(Some(dn.latency));
         shared.count.dn_lat.store(dn.latency as u64, Ordering::Relaxed);
-        chain.prepare(RATE as f64, MAX_BLOCK);
+        eprintln!("denoise: hops p99 {:.1} ms, longest {:.1} ms here: slack {:.0} ms", dn.p99_us as f64 / 1000.0, dn.max_us as f64 / 1000.0, (dn.latency - dn.model) as f64 * 1000.0 / RATE as f64);
         chain.set_bypass(cfg.bypass);
+        let dn_latency = dn.latency;
         Ok(Rt {
             gen: shared.gen.load(Ordering::Acquire),
             shared: shared.clone(),
@@ -372,6 +394,8 @@ impl Rt {
             dn,
             dnb: Vec::with_capacity(MAX_BLOCK),
             dn_debt: 0,
+            dn_lat: dn_latency,
+            dn_pad: 0,
             mic: Vec::with_capacity(MAX_BLOCK),
             s: Vec::with_capacity(MAX_BLOCK),
             m: Vec::with_capacity(MAX_BLOCK),
