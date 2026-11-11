@@ -1,4 +1,5 @@
 //! Latency test (build-plan.md step 6): `stream-mic --latency PLAY_NODE REC_NODE [SECONDS] [QUANTUM]`.
+//! REC_NODE as `src:NAME` listens to a source, e.g. an interface's input with its output cabled back to it.
 //!
 //! One client, two streams on the same audio thread: an output into PLAY_NODE (the test mic, a sink whose monitor
 //! the engine takes as its mic) sending a click every half second, and an input from REC_NODE ("stream-mic").
@@ -39,6 +40,8 @@ struct St {
 }
 
 pub fn run(play: &str, rec: &str, secs: f64, quantum: u32) -> Result<(), String> {
+    // "src:NAME" listens to a source (a real interface's input, for a cable loop) instead of a sink's monitor
+    let (rec, is_source) = match rec.strip_prefix("src:") { Some(r) => (r, true), None => (rec, rec == crate::audio::SOURCE_NAME) };
     pw::init();
     let mainloop = pw::main_loop::MainLoop::new(None).map_err(|e| e.to_string())?;
     let context = pw::context::Context::new(&mainloop).map_err(|e| e.to_string())?;
@@ -96,7 +99,7 @@ pub fn run(play: &str, rec: &str, secs: f64, quantum: u32) -> Result<(), String>
 
     let inp = pw::stream::Stream::new(&core, "latency listen", props(&[("media.type", "Audio"), ("media.category", "Capture"), ("node.latency", &latency), ("target.object", rec), ("node.dont-fallback", "true"),
             // a sink (the headphones stand-in): listen to its monitor
-            ("stream.capture.sink", if rec == crate::audio::SOURCE_NAME { "false" } else { "true" })]))
+            ("stream.capture.sink", if is_source { "false" } else { "true" })]))
         .map_err(|e| e.to_string())?;
     let s = st.clone();
     let _li = inp
