@@ -125,6 +125,15 @@ def comp_styles():
     v = post({"preset": {"comp": {"style": "clean"}}})
     c = v["preset"]["comp"]
     check("clean style: one release stage", (c["style"], c["rel2"], c["auto_att"], c["att"], c["rel"]) == ("clean", 0.0, False, 10.0, 120.0), c)
+    v = post({"preset": {"comp": {"style": "two-knob"}}})
+    c = v["preset"]["comp"]
+    check("two knobs: the mode and the model's times", c["two_knob"] and c["auto_att"] and c["rel2"] > 0, c)
+    r0 = c["rel2"]
+    v = post({"preset": {"comp": {"amount": 100}}})
+    check("two knobs: more Amount, a faster release, still the mode", v["preset"]["comp"]["rel2"] < r0 and v["preset"]["comp"]["style"] == "two-knob")
+    v = post({"preset": {"comp": {"two_knob": False}}})
+    check("two knobs switched off: custom", v["preset"]["comp"]["style"] == "")
+    post({"preset": {"comp": {"style": "clean"}}})
     code, _ = api("POST", "/api/state", {"preset": {"comp": {"style": "nope"}}})
     _, v = api("GET", "/api/state")
     check("unknown style refused, the style kept", code == 400 and v["preset"]["comp"]["style"] == "clean", code)

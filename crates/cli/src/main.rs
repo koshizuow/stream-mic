@@ -405,7 +405,7 @@ fn run_chain(inp: &str, out: &str, name: &str, sets: &[(String, f64)], music: Op
     let audio = x.len() as f64 / fs as f64;
     let times = c.times.unwrap_or_default();
     let on = &c.preset().on;
-    let flags = [on.denoise, on.eq, on.deess, on.exp, on.comp, on.verb, on.lim];
+    let flags = [on.denoise, on.lowcut, on.eq, on.deess, on.exp, on.comp, on.verb, on.lim];
     eprintln!("preset {} ({}), block {block}{}", c.preset().name, c.preset().label, if realtime { ", real-time pace" } else { "" });
     eprintln!("{:8} {:>7} {:>7}", "stage", "own %", "cum %");
     let mut cum = 0.0;

@@ -251,7 +251,14 @@ pub fn apply(shared: &Shared, v: &Value) -> Result<(), String> {
                         err = Some(format!("no compressor style {st}"));
                         c.preset.comp.style = bc.style.clone();
                     }
+                } else if cc.two_knob && (cc.amount, cc.limit) != (bc.amount, bc.limit) {
+                    // the two-knob mode: Amount or Compress/Limit brings the model's times along
+                    c.preset.comp.two_knob_times();
                 } else if (cc.ratio, cc.knee, cc.att, cc.rel, cc.rel2, cc.slow, cc.memory, cc.auto_att) != (bc.ratio, bc.knee, bc.att, bc.rel, bc.rel2, bc.slow, bc.memory, bc.auto_att) {
+                    c.preset.comp.style = String::new();
+                }
+                // the mode switched off by hand: not its style any more
+                if !c.preset.comp.two_knob && c.preset.comp.style == "two-knob" {
                     c.preset.comp.style = String::new();
                 }
                 // an EQ style chosen: its values; an EQ value changed by hand (not by the Body knob): no style any more

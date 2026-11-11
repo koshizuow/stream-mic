@@ -84,18 +84,49 @@ pub struct CompParams {
     /// The attack time is `att_ms` at no reduction and halves for every 5 dB of reduction it heads for (the probed
     /// model: half way in about 30 ms at 5 dB, 12 ms at 12 dB, 5 ms at 20 dB).
     pub att_auto: bool,
+    /// A measured static curve in place of threshold, ratio and knee (the two-knob optical mode).
+    pub curve: Option<GrCurve>,
+}
+
+/// Gain reduction (dB, >= 0) at evenly spaced input levels; straight lines between them, the ends held.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GrCurve {
+    /// the first point's level, dBFS
+    pub lo: f64,
+    pub step: f64,
+    pub gr: [f64; GR_POINTS],
+}
+
+pub const GR_POINTS: usize = 34;
+
+impl GrCurve {
+    pub fn at(&self, x: f64) -> f64 {
+        let f = ((x - self.lo) / self.step).clamp(0.0, (GR_POINTS - 1) as f64);
+        let i = (f as usize).min(GR_POINTS - 2);
+        let t = f - i as f64;
+        self.gr[i] + t * (self.gr[i + 1] - self.gr[i])
+    }
 }
 
 impl Default for CompParams {
     /// The talk preset.
     fn default() -> Self {
-        CompParams { thr_db: -24.0, ratio: 3.0, knee_db: 6.0, att_ms: 10.0, rel_ms: 120.0, makeup_db: 6.0, sc_hp_hz: 100.0, rel2_ms: 0.0, slow: 0.0, memory: 0.0, att_auto: false }
+        CompParams { thr_db: -24.0, ratio: 3.0, knee_db: 6.0, att_ms: 10.0, rel_ms: 120.0, makeup_db: 6.0, sc_hp_hz: 100.0, rel2_ms: 0.0, slow: 0.0, memory: 0.0, att_auto: false, curve: None }
     }
 }
 
 impl CompParams {
     fn opto(&self) -> bool {
         self.rel2_ms > 0.0 || self.att_auto
+    }
+
+    /// how much to reduce (dB, >= 0) for a sidechain level `xg`
+    #[inline]
+    fn reduce(&self, xg: f64) -> f64 {
+        match &self.curve {
+            Some(c) => c.at(xg),
+            None => xg - compress_curve(xg, self.thr_db, self.ratio, self.knee_db),
+        }
     }
 }
 
@@ -164,7 +195,7 @@ impl Stage for Compressor {
         for s in x.iter_mut() {
             let v = *s as f64;
             let xg = db(self.sc.tick(v));
-            let xl = xg - compress_curve(xg, p.thr_db, p.ratio, p.knee_db);
+            let xl = p.reduce(xg);
             self.y1 = xl.max(self.ar * self.y1 + (1.0 - self.ar) * xl);
             self.yl = self.aa * self.yl + (1.0 - self.aa) * self.y1;
             *s = (v * undb(p.makeup_db - self.yl)) as f32;
@@ -196,7 +227,7 @@ impl Compressor {
         for s in x.iter_mut() {
             let v = *s as f64;
             let xg = db(self.sc.tick(v));
-            let xl = xg - compress_curve(xg, p.thr_db, p.ratio, p.knee_db);
+            let xl = p.reduce(xg);
             // the attack: one pole, its time constant shortened by the reduction it is heading for
             let ka = if p.att_auto { (crate::m::exp(xl.max(0.0) * ATT_HALVE) / att_n).min(1.0) } else { 1.0 - self.aa };
             if xl > self.yf {
@@ -407,6 +438,22 @@ mod tests {
         // the fast stage does most of the first 60 ms
         let d = rem(0.5, 60);
         assert!(d < 0.55, "60 ms: {d}");
+    }
+
+    #[test]
+    fn a_curve_replaces_the_formula() {
+        let mut gr = [0.0; GR_POINTS];
+        for (i, g) in gr.iter_mut().enumerate() {
+            *g = (i as f64 - 20.0).max(0.0) * 0.5;
+        }
+        let c = GrCurve { lo: -60.0, step: 2.0, gr };
+        assert_eq!(c.at(-100.0), 0.0);
+        assert!((c.at(-15.0) - 1.25).abs() < 1e-9);
+        assert_eq!(c.at(20.0), gr[GR_POINTS - 1]);
+        // a steady tone at -15 dBFS settles at the curve's reduction
+        let p = CompParams { curve: Some(c), sc_hp_hz: 0.0, ..opto() };
+        let (g, _) = opto_gr(p, -15.0, -15.0, 0.1);
+        assert!((g.last().unwrap() - 1.25).abs() < 0.2, "{}", g.last().unwrap());
     }
 
     #[test]

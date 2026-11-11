@@ -5,7 +5,8 @@
 use serde::{Deserialize, Serialize};
 use stream_mic_denoise::DenoiseParams;
 use stream_mic_dsp::deesser::DeessParams;
-use stream_mic_dsp::dynamics::{CompParams, ExpParams};
+use stream_mic_dsp::dynamics::{CompParams, ExpParams, GrCurve, GR_POINTS};
+use crate::opto_table as ot;
 use stream_mic_dsp::eq::EqParams;
 use stream_mic_dsp::limiter::LimParams;
 use stream_mic_dsp::reverb::VerbParams;
@@ -184,11 +185,54 @@ pub struct CompP {
     pub memory: f64,
     /// the attack halves for every 5 dB of reduction (Attack is then its time at none)
     pub auto_att: bool,
+    /// the two-knob optical mode: Amount and Makeup (with Compress/Limit) are all there is; the measured curves
+    /// (opto_table.rs) replace threshold, ratio and knee, and Threshold only lines the curve up with the voice
+    /// (auto setup sets it)
+    pub two_knob: bool,
+    /// 0..100: Peak Reduction 40..100 of the measured model
+    pub amount: f64,
+    /// Limit instead of Compress
+    pub limit: bool,
+}
+
+/// where the measured curves sit when Threshold is at the default -24: the model's own levels
+const TWO_KNOB_REF: f64 = -24.0;
+
+impl CompP {
+    fn pr(&self) -> f64 {
+        40.0 + self.amount.clamp(0.0, 100.0) * 0.6
+    }
+
+    /// the measured curve for Amount and the mode, moved with Threshold
+    pub fn two_knob_curve(&self) -> GrCurve {
+        let rows = if self.limit { &ot::LIMIT } else { &ot::COMPRESS };
+        let f = ((self.pr() - ot::PRS[0]) / 10.0).clamp(0.0, (ot::PRS.len() - 1) as f64);
+        let i = (f as usize).min(ot::PRS.len() - 2);
+        let t = f - i as f64;
+        let mut gr = [0.0; GR_POINTS];
+        for (k, g) in gr.iter_mut().enumerate() {
+            *g = rows[i][k] + t * (rows[i + 1][k] - rows[i][k]);
+        }
+        GrCurve { lo: ot::LO + (self.thr - TWO_KNOB_REF), step: 2.0, gr }
+    }
+
+    /// the times that go with Amount and the mode (the model's), into the values the page shows
+    pub fn two_knob_times(&mut self) {
+        let rel = if self.limit { &ot::LIMIT_REL } else { &ot::COMPRESS_REL };
+        let pr = self.pr();
+        let at = |j: usize| rel[j][0] + rel[j][1] * pr;
+        self.rel = at(0).round().clamp(30.0, 400.0);
+        self.rel2 = (at(1) / 10.0).round() * 10.0;
+        self.slow = at(2).round();
+        self.memory = 50.0;
+        self.att = 80.0;
+        self.auto_att = true;
+    }
 }
 
 impl Default for CompP {
     fn default() -> Self {
-        CompP { style: String::new(), thr: -24.0, ratio: 3.0, knee: 6.0, att: 10.0, rel: 120.0, makeup: 6.0, rel2: 0.0, slow: 0.0, memory: 0.0, auto_att: false }
+        CompP { style: String::new(), thr: -24.0, ratio: 3.0, knee: 6.0, att: 10.0, rel: 120.0, makeup: 6.0, rel2: 0.0, slow: 0.0, memory: 0.0, auto_att: false, two_knob: false, amount: 50.0, limit: false }
     }
 }
 
@@ -494,9 +538,17 @@ impl Preset {
 
     /// A compressor style: its ratio, knee, attack and release; the threshold and makeup stay
     pub fn set_comp_style(&mut self, name: &str) -> bool {
+        if name == "two-knob" {
+            let c = &mut self.comp;
+            c.style = name.to_string();
+            c.two_knob = true;
+            c.two_knob_times();
+            return true;
+        }
         let Some(st) = comp_style(name) else { return false };
         let c = &mut self.comp;
         c.style = st.name.to_string();
+        c.two_knob = false;
         (c.ratio, c.knee, c.att, c.rel, c.rel2, c.slow, c.memory, c.auto_att) = (st.ratio, st.knee, st.att, st.rel, st.rel2, st.slow, st.memory, st.auto_att);
         true
     }
@@ -567,6 +619,7 @@ impl Preset {
             slow: c.slow / 100.0,
             memory: c.memory / 100.0,
             att_auto: c.auto_att,
+            curve: if c.two_knob { Some(c.two_knob_curve()) } else { None },
             ..CompParams::default()
         }
     }
@@ -619,6 +672,34 @@ mod tests {
         assert_eq!((p.comp.ratio, p.comp.knee, p.comp.att, p.comp.rel, p.comp.rel2, p.comp.auto_att), (t.ratio, t.knee, t.att, t.rel, 0.0, false));
         assert!(!p.set_comp_style("nope"));
         assert!(Preset::parse(&p.to_toml()).unwrap() == p);
+    }
+
+    #[test]
+    fn two_knob_mode() {
+        let mut p = Preset::built_in("talk-omni").unwrap();
+        assert!(p.set_comp_style("two-knob"));
+        assert!(p.comp.two_knob && p.comp.auto_att);
+        // more Amount: more reduction at the same level, and a faster release
+        let at = |p: &Preset, x: f64| p.comp_params().curve.unwrap().at(x);
+        p.comp.amount = 0.0;
+        p.comp.two_knob_times();
+        let (g0, r0) = (at(&p, -20.0), p.comp.rel2);
+        p.comp.amount = 100.0;
+        p.comp.two_knob_times();
+        let (g1, r1) = (at(&p, -20.0), p.comp.rel2);
+        assert!(g1 > g0 + 8.0 && r1 < r0, "{g0} {g1} {r0} {r1}");
+        // Threshold moves the whole curve: 6 dB lower, the same reduction 6 dB lower
+        let g = at(&p, -20.0);
+        p.comp.thr -= 6.0;
+        assert!((at(&p, -26.0) - g).abs() < 1e-9);
+        // Limit is harder than Compress at the top
+        p.comp.amount = 83.0;
+        let c = at(&p, -14.0);
+        p.comp.limit = true;
+        assert!(at(&p, -6.0) - at(&p, -14.0) >= 0.0 && c > 0.0);
+        // another style leaves the mode
+        assert!(p.set_comp_style("opto"));
+        assert!(!p.comp.two_knob && p.comp_params().curve.is_none());
     }
 
     #[test]

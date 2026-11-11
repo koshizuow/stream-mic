@@ -18,6 +18,7 @@
 
 pub mod autoset;
 pub mod preset;
+pub mod opto_table;
 
 use std::time::Instant;
 
