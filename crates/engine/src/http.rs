@@ -243,6 +243,17 @@ pub fn apply(shared: &Shared, v: &Value) -> Result<(), String> {
                 } else if (cv.size, cv.pre, cv.lowcut, cv.damp, cv.er, cv.er_ms, cv.hc) != (bv.size, bv.pre, bv.lowcut, bv.damp, bv.er, bv.er_ms, bv.hc) {
                     c.preset.verb.style = String::new();
                 }
+                // a compressor style chosen: its values; how it compresses or moves changed by hand: no style any more
+                let (bc, cc) = (&before.preset.comp, &c.preset.comp);
+                if cc.style != bc.style && !cc.style.is_empty() {
+                    let st = c.preset.comp.style.clone();
+                    if !c.preset.set_comp_style(&st) {
+                        err = Some(format!("no compressor style {st}"));
+                        c.preset.comp.style = bc.style.clone();
+                    }
+                } else if (cc.ratio, cc.knee, cc.att, cc.rel, cc.rel2, cc.slow, cc.memory, cc.auto_att) != (bc.ratio, bc.knee, bc.att, bc.rel, bc.rel2, bc.slow, bc.memory, bc.auto_att) {
+                    c.preset.comp.style = String::new();
+                }
                 // an EQ style chosen: its values; an EQ value changed by hand (not by the Body knob): no style any more
                 let (be, ce) = (&before.preset.eq, &c.preset.eq);
                 let knob_moved = c.preset.knobs.body != before.preset.knobs.body;

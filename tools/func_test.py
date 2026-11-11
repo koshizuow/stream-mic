@@ -110,6 +110,28 @@ def settings_and_file():
 
 
 @test
+def comp_styles():
+    v = post({"preset_name": "sing"})
+    thr, mk = v["preset"]["comp"]["thr"], v["preset"]["comp"]["makeup"]
+    v = post({"preset": {"comp": {"style": "opto"}}})
+    c = v["preset"]["comp"]
+    check("optical style: its values", (c["style"], c["ratio"], c["knee"], c["att"], c["rel"], c["rel2"], c["slow"], c["memory"], c["auto_att"])
+          == ("opto", 3.0, 12.0, 80.0, 40.0, 700.0, 35.0, 50.0, True), c)
+    check("a style keeps the threshold and makeup", (c["thr"], c["makeup"]) == (thr, mk))
+    v = post({"preset": {"comp": {"thr": -30}}})
+    check("the threshold is not the style's", v["preset"]["comp"]["style"] == "opto")
+    v = post({"preset": {"comp": {"rel2": 900}}})
+    check("a value changed by hand: custom", v["preset"]["comp"]["style"] == "" and v["preset"]["comp"]["rel2"] == 900)
+    v = post({"preset": {"comp": {"style": "clean"}}})
+    c = v["preset"]["comp"]
+    check("clean style: one release stage", (c["style"], c["rel2"], c["auto_att"], c["att"], c["rel"]) == ("clean", 0.0, False, 10.0, 120.0), c)
+    code, _ = api("POST", "/api/state", {"preset": {"comp": {"style": "nope"}}})
+    _, v = api("GET", "/api/state")
+    check("unknown style refused, the style kept", code == 400 and v["preset"]["comp"]["style"] == "clean", code)
+    post({"reset_preset": True})
+
+
+@test
 def restart_keeps_settings():
     global ENG
     post({"monitor_db": -4, "preset_name": "talk-omni"})

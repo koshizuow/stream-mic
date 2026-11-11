@@ -168,18 +168,57 @@ impl Default for ExpP {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default)]
 pub struct CompP {
+    /// the style the values came from (COMP_STYLES), "" when they were changed by hand
+    pub style: String,
     pub thr: f64,
     pub ratio: f64,
     pub knee: f64,
     pub att: f64,
     pub rel: f64,
     pub makeup: f64,
+    /// a slow second release stage, ms; 0 = one stage only
+    pub rel2: f64,
+    /// the slow stage's share of the release, %
+    pub slow: f64,
+    /// after long reduction the slow stage gets up to this much slower, %
+    pub memory: f64,
+    /// the attack halves for every 5 dB of reduction (Attack is then its time at none)
+    pub auto_att: bool,
 }
 
 impl Default for CompP {
     fn default() -> Self {
-        CompP { thr: -24.0, ratio: 3.0, knee: 6.0, att: 10.0, rel: 120.0, makeup: 6.0 }
+        CompP { style: String::new(), thr: -24.0, ratio: 3.0, knee: 6.0, att: 10.0, rel: 120.0, makeup: 6.0, rel2: 0.0, slow: 0.0, memory: 0.0, auto_att: false }
     }
+}
+
+/// A compressor style: how it compresses (ratio, knee) and moves (attack, release); the threshold and makeup stay
+/// (they are the level's, auto setup's)
+#[derive(Clone, Copy, Debug)]
+pub struct CompStyle {
+    pub name: &'static str,
+    pub ratio: f64,
+    pub knee: f64,
+    pub att: f64,
+    pub rel: f64,
+    pub rel2: f64,
+    pub slow: f64,
+    pub memory: f64,
+    pub auto_att: bool,
+}
+
+/// "clean": the talk presets' own; "opto": an optical leveller's, from an LA-2A model trained on SignalTrain's
+/// recordings and probed with test signals (stream-mic design notes comp-styles.md, 2026-11-11): ratio about 3 with
+/// a wide knee at its stronger settings; half way in 30 ms at 5 dB, 12 at 12 dB, 5 at 20 dB (an 80 ms attack halving
+/// every 5 dB); a release of 65 % in about 40 ms and 35 % in about 0.7 s, the slow part about 1.5 times as slow
+/// after a long hold.
+pub const COMP_STYLES: [CompStyle; 2] = [
+    CompStyle { name: "clean", ratio: 3.0, knee: 6.0, att: 10.0, rel: 120.0, rel2: 0.0, slow: 0.0, memory: 0.0, auto_att: false },
+    CompStyle { name: "opto", ratio: 3.0, knee: 12.0, att: 80.0, rel: 40.0, rel2: 700.0, slow: 35.0, memory: 50.0, auto_att: true },
+];
+
+pub fn comp_style(name: &str) -> Option<CompStyle> {
+    COMP_STYLES.iter().copied().find(|s| s.name == name)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -453,6 +492,15 @@ impl Preset {
         true
     }
 
+    /// A compressor style: its ratio, knee, attack and release; the threshold and makeup stay
+    pub fn set_comp_style(&mut self, name: &str) -> bool {
+        let Some(st) = comp_style(name) else { return false };
+        let c = &mut self.comp;
+        c.style = st.name.to_string();
+        (c.ratio, c.knee, c.att, c.rel, c.rel2, c.slow, c.memory, c.auto_att) = (st.ratio, st.knee, st.att, st.rel, st.rel2, st.slow, st.memory, st.auto_att);
+        true
+    }
+
     /// An EQ style: its values, Low and Presence as the Body knob's base, and the Body knob again on top
     pub fn set_eq_style(&mut self, name: &str) -> bool {
         let Some(st) = eq_style(name) else { return false };
@@ -508,7 +556,19 @@ impl Preset {
 
     pub fn comp_params(&self) -> CompParams {
         let c = &self.comp;
-        CompParams { thr_db: c.thr, ratio: c.ratio, knee_db: c.knee, att_ms: c.att, rel_ms: c.rel, makeup_db: c.makeup, ..CompParams::default() }
+        CompParams {
+            thr_db: c.thr,
+            ratio: c.ratio,
+            knee_db: c.knee,
+            att_ms: c.att,
+            rel_ms: c.rel,
+            makeup_db: c.makeup,
+            rel2_ms: c.rel2,
+            slow: c.slow / 100.0,
+            memory: c.memory / 100.0,
+            att_auto: c.auto_att,
+            ..CompParams::default()
+        }
     }
 
     pub fn verb_params(&self) -> VerbParams {
@@ -545,6 +605,20 @@ mod tests {
             // changes nothing
             assert_eq!(p.from_knobs(), p, "{name}");
         }
+    }
+
+    #[test]
+    fn comp_styles() {
+        let mut p = Preset::built_in("sing").unwrap();
+        let (thr, mk) = (p.comp.thr, p.comp.makeup);
+        assert!(p.set_comp_style("opto"));
+        assert_eq!((p.comp.style.as_str(), p.comp.rel2, p.comp.thr, p.comp.makeup), ("opto", 700.0, thr, mk));
+        assert!(p.set_comp_style("clean"));
+        // the talk presets' own values are the clean style's
+        let t = Preset::built_in("talk-omni").unwrap().comp;
+        assert_eq!((p.comp.ratio, p.comp.knee, p.comp.att, p.comp.rel, p.comp.rel2, p.comp.auto_att), (t.ratio, t.knee, t.att, t.rel, 0.0, false));
+        assert!(!p.set_comp_style("nope"));
+        assert!(Preset::parse(&p.to_toml()).unwrap() == p);
     }
 
     #[test]

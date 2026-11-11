@@ -156,6 +156,18 @@ def page_test(name, page):
             set_range(page, f'#detail .lvl[data-p="{pid}"] input', v)
             ok = wait_for(lambda: abs(state()["preset"][st][pid] - v) < 1e-6)
             check(f"{name}: {st}.{pid}", ok, f"set {v}, engine {state()['preset'][st][pid]}")
+        if st == "comp":
+            # its styles and the automatic attack
+            page.click('#cstyles button[data-v="opto"]')
+            check(f"{name}: comp style opto", wait_for(lambda: state()["preset"]["comp"]["style"] == "opto" and state()["preset"]["comp"]["rel2"] == 700))
+            check(f"{name}: ... its button lit", wait_for(lambda: page.get_attribute('#cstyles button[data-v="opto"]', "aria-pressed") == "true"))
+            page.click("#autoAtt")
+            check(f"{name}: comp automatic attack off, custom", wait_for(lambda: state()["preset"]["comp"]["auto_att"] is False and state()["preset"]["comp"]["style"] == ""))
+            if os.environ.get("SHOT"):
+                page.click('#cstyles button[data-v="opto"]')
+                wait_for(lambda: state()["preset"]["comp"]["style"] == "opto")
+                page.wait_for_timeout(300)
+                page.locator("#detail").screenshot(path=os.environ["SHOT"] + f"-{name}.png")
         page.click(f'#chain .mod[data-s="{st}"]')
     api("POST", "/api/state", {"reset_preset": True, "monitor_db": 0, "pc_db": 0, "loopback_db": 0})
 

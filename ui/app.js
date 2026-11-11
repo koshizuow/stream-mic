@@ -33,6 +33,8 @@ const I18N = {
     verb_note: '八種人聲用的風格，各自有不同的長度、音色、初期反射和預延遲；空間感旋鈕只調量。改了下面的數值就是自訂。', custom: '自訂',
     verb_note_pub: '照這一家公開的預設數值換算成這裡的參數；reverb 的算法不同，聽起來接近但不會一樣。空間感旋鈕只調量，改了下面的數值就是自訂。',
     fam_ours: '標準', fam_y: 'Y 家', fam_d: 'D 家', fam_f: 'F 家',
+    comp_clean: '乾淨', comp_opto: '光電式', comp_custom: '目前是模式的預設或自訂的值。', auto_att: '自動起音（壓得越多越快）',
+    comp_note: '光電式：壓得越多起音越快；放開時先很快回一大半，剩下的慢慢回來，壓得越久尾巴越慢。門檻和補償不變；改了下面的數值就是自訂。',
     eq_natural: '自然', eq_demud: '去悶', eq_phone: '電話', eq_custom: '目前是模式的預設或自訂的值。',
     eq_style_note: '選一個風格當起點，厚薄旋鈕會在上面再加厚或減薄；改了下面的數值就是自訂。',
     eq_style_pub: '這一家公開的預設數值：中頻、清晰照原本的頻率和 Q；最低、最高那段換成我們的低頻、空氣感架形，所以接近但不完全一樣。厚薄旋鈕在上面再調。',
@@ -95,6 +97,8 @@ const I18N = {
     verb_note: 'Eight styles for a voice, each its own length, tone, early reflections and pre-delay; the Space knob sets only how much. Changing a value below makes it custom.', custom: 'Custom',
     verb_note_pub: 'This maker’s published preset values, turned into the settings here; the reverb itself is a different one, so it sounds close, not the same. The Space knob sets only how much; changing a value below makes it custom.',
     fam_ours: 'Standard', fam_y: 'Y', fam_d: 'D', fam_f: 'F',
+    comp_clean: 'Clean', comp_opto: 'Optical', comp_custom: 'The mode’s own values, or custom. ', auto_att: 'Automatic attack (faster the more it reduces)',
+    comp_note: 'Optical: the attack gets faster the more it reduces; letting go, most comes back quickly and the rest slowly, the slower the longer it was reducing. Threshold and makeup stay; changing a value below makes it custom.',
     eq_natural: 'Natural', eq_demud: 'De-mud', eq_phone: 'Phone', eq_custom: 'The mode’s own values, or custom. ',
     eq_style_note: 'A style to start from; the Body knob adds or takes away on top; changing a value below makes it custom.',
     eq_style_pub: 'This maker’s published preset values: the mid and presence bells at their own frequency and Q; their lowest and highest go to our Low and Air shelves, so near, not the same. The Body knob adjusts on top.',
@@ -168,6 +172,8 @@ const VERB_STYLES = VERB_FAMILIES.flatMap(([, l]) => l);
 // the EQ's styles (crates/chain/src/preset.rs EQ_STYLES): ours, and "f" (Focusrite Vocaster's published Enhance presets)
 const EQ_FAMILIES = [['ours', [['natural', t0('eq_natural')], ['demud', t0('eq_demud')], ['phone', t0('eq_phone')]]], ['f', [['f-clean', 'Clean'], ['f-warm', 'Warm'], ['f-bright', 'Bright'], ['f-radio', 'Radio']]]];
 let eqFam = null;
+// the compressor's styles (crates/chain/src/preset.rs COMP_STYLES)
+const COMP_STYLES = [['clean', t0('comp_clean')], ['opto', t0('comp_opto')]];
 function t0(k) { return () => t(k); }
 const nm = (n) => (typeof n === 'function' ? n() : n);
 const famOf = (style) => (VERB_FAMILIES.find(([, l]) => l.some(([v]) => v === style)) || [null])[0];
@@ -291,13 +297,13 @@ const STAGES = [
   { id: 'eq', name: 'EQ', params: [['low', 'Low (200 Hz)', -6, 6, 0.5, 'dB'], ['mid', 'Mid', -6, 6, 0.5, 'dB'], ['mid_f', 'Mid frequency', 200, 1000, 10, 'Hz'], ['mid_q', 'Mid Q', 0.5, 4, 0.05, ''], ['pres', 'Presence', -6, 6, 0.5, 'dB'], ['pres_f', 'Presence frequency', 2000, 6000, 50, 'Hz'], ['pres_q', 'Presence Q', 0.5, 4, 0.05, ''], ['air', 'Air (10 kHz)', -6, 6, 0.5, 'dB'], ['hc', 'High Cut', 2000, 20000, 100, 'Hz']] },
   { id: 'deess', name: 'De-esser', params: [['thr', 'Threshold', -10, 20, 0.5, 'dB'], ['freq', 'Frequency', 4000, 10000, 100, 'Hz'], ['max', 'Range', 3, 12, 1, 'dB']] },
   { id: 'exp', name: 'Gate', params: [['thr', 'Threshold', -80, -20, 1, 'dBFS'], ['ratio', 'Ratio 1:', 1.2, 4, 0.1, ''], ['range', 'Range', 3, 20, 1, 'dB'], ['hold', 'Hold', 0, 300, 10, 'ms'], ['rel', 'Release', 50, 1000, 10, 'ms']] },
-  { id: 'comp', name: 'Compressor', params: [['thr', 'Threshold', -40, -6, 0.5, 'dBFS'], ['ratio', 'Ratio', 1, 8, 0.1, ':1'], ['knee', 'Knee', 0, 12, 0.5, 'dB'], ['att', 'Attack', 1, 40, 1, 'ms'], ['rel', 'Release', 30, 400, 5, 'ms'], ['makeup', 'Makeup', 0, 18, 0.5, 'dB']] },
+  { id: 'comp', name: 'Compressor', params: [['thr', 'Threshold', -40, -6, 0.5, 'dBFS'], ['ratio', 'Ratio', 1, 8, 0.1, ':1'], ['knee', 'Knee', 0, 12, 0.5, 'dB'], ['att', 'Attack', 1, 120, 1, 'ms'], ['rel', 'Release', 30, 400, 5, 'ms'], ['makeup', 'Makeup', 0, 18, 0.5, 'dB'], ['rel2', 'Slow release', 0, 2000, 10, 'ms'], ['slow', 'Slow share', 0, 100, 1, '%'], ['memory', 'Memory', 0, 100, 5, '%']] },
   { id: 'verb', name: 'Reverb', params: [['mix', 'Mix', 0, 40, 1, '%'], ['mix_dry', 'Mix (no backing)', 0, 40, 1, '%', 'sing'], ['follow', 'Follow', 0.3, 4, 0.1, 's', 'sing'], ['size', 'Decay', 0.2, 2.5, 0.05, 's'], ['pre', 'Pre-delay', 0, 100, 0.1, 'ms'], ['lowcut', 'Low Cut', 0, 500, 10, 'Hz'], ['damp', 'Damping', 1000, 20000, 50, 'Hz'], ['er', 'Early reflections', 0, 2, 0.01, ''], ['er_ms', 'Reflections spread', 5, 100, 0.1, 'ms'], ['hc', 'High Cut', 2000, 20000, 100, 'Hz']] },
   { id: 'lim', name: 'Limiter', params: [['ceil', 'Ceiling (true peak)', -6, 0, 0.1, 'dBTP'], ['rel', 'Release', 20, 200, 5, 'ms']] },
 ];
 const fmtP = (v, step) => (step < 1 ? (+v).toFixed(step < 0.1 ? 2 : 1) : String(Math.round(v)));
 // a detail slider's value as shown: the high cut at its top is off
-const pText = (sid, id, v, q) => ((id === 'hc' && (+v >= 20000 || +v === 0)) || (sid === 'verb' && id === 'lowcut' && +v === 0) ? t('w_off') : fmtP(v, q[4]) + (q[5] ? ' ' + q[5] : ''));
+const pText = (sid, id, v, q) => ((id === 'hc' && (+v >= 20000 || +v === 0)) || (sid === 'verb' && id === 'lowcut' && +v === 0) || (sid === 'comp' && id === 'rel2' && +v === 0) ? t('w_off') : fmtP(v, q[4]) + (q[5] ? ' ' + q[5] : ''));
 const stageLatency = (id) => (id === 'denoise' ? ST.denoise_ms || 20 : id === 'lim' ? ST.send_limiter_ms || 2.1 : 0);
 const msText = (ms) => (ms ? (Math.round(ms * 10) / 10).toFixed(ms % 1 ? 1 : 0) : '0') + ' ms';
 function setKnob(id, v) {
@@ -847,6 +853,9 @@ function buildDetail() {
     (s.id === 'eq' ? '<div class="seg" id="efams" style="margin-bottom:6px">' + EQ_FAMILIES.map(([f]) => '<button data-f="' + f + '">' + t('fam_' + f) + '</button>').join('') + '</div>' +
       '<div class="seg" id="estyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)"></div><p class="note"><span id="ecustom"></span><span id="enote"></span></p>' +
       '<canvas id="eqc"></canvas><p class="note">' + t('eq_note') + '</p>' : '') +
+    (s.id === 'comp' ? '<div class="seg" id="cstyles" style="margin-bottom:6px">' + COMP_STYLES.map(([v, n]) => '<button data-v="' + v + '">' + nm(n) + '</button>').join('') + '</div>' +
+      '<p class="note"><span id="ccustom"></span>' + t('comp_note') + '</p>' +
+      '<div class="row" style="grid-template-columns:1fr auto;margin-bottom:6px"><span>' + t('auto_att') + '</span><button class="sw" id="autoAtt" role="switch" aria-label="' + t('auto_att') + '"></button></div>' : '') +
     (s.id === 'verb' ? '<div class="seg" id="vfams" style="margin-bottom:6px">' + VERB_FAMILIES.map(([f]) => '<button data-f="' + f + '">' + t('fam_' + f) + '</button>').join('') + '</div>' +
       '<div class="seg" id="vstyles" style="grid-auto-flow:row;grid-template-columns:repeat(4,1fr)"></div><p class="note"><span id="vcustom"></span><span id="vnote"></span></p>' : '') +
     s.params.map(([id, name, lo, hi, st, u, only]) => '<label class="lvl" data-p="' + id + '"' + (only ? ' data-only="' + only + '"' : '') + '><span>' + name + '</span><input type="range" min="' + lo + '" max="' + hi + '" step="' + st + '"><output></output></label>').join('');
@@ -864,6 +873,10 @@ function buildDetail() {
     eqDrag($('eqc'));
     $('efams').onclick = (e) => { const b = e.target.closest('button'); if (b) { eqFam = b.dataset.f; detailUI(); } };
     $('estyles').onclick = (e) => { const b = e.target.closest('button'); if (b) post({ preset: { eq: { style: b.dataset.v } } }); };
+  }
+  if (s.id === 'comp') {
+    $('cstyles').onclick = (e) => { const b = e.target.closest('button'); if (b) post({ preset: { comp: { style: b.dataset.v } } }); };
+    $('autoAtt').onclick = () => post({ preset: { comp: { auto_att: !P().comp.auto_att } } });
   }
   if (s.id === 'verb') {
     $('vfams').onclick = (e) => { const b = e.target.closest('button'); if (b) { verbFam = b.dataset.f; detailUI(); } };
@@ -893,6 +906,11 @@ function detailUI() {
     for (const b of $('estyles').children) b.setAttribute('aria-pressed', b.dataset.v === cur);
     $('ecustom').textContent = cur ? '' : t('eq_custom');
     $('enote').textContent = t(fam === 'ours' ? 'eq_style_note' : 'eq_style_pub');
+  }
+  if (s.id === 'comp') {
+    for (const b of $('cstyles').children) b.setAttribute('aria-pressed', b.dataset.v === P().comp.style);
+    $('ccustom').textContent = P().comp.style ? '' : t('comp_custom');
+    $('autoAtt').setAttribute('aria-checked', !!P().comp.auto_att);
   }
   if (s.id === 'verb') {
     const fam = verbFam || famOf(P().verb.style) || 'ours';
